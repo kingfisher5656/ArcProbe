@@ -16,7 +16,7 @@ Official history and local estimates stay separate. Constants are a dated snapsh
 
 ## Install and configure
 
-The generated `artifacts/ArcProbe-0.2.1.ipa` is an unsigned iPhoneOS arm64 package. Import it into SideStore for signing and installation. It is not a pre-signed IPA. Direct installation is the intended path for Shortcuts; LiveContainer background-action discovery has not been verified.
+The generated `artifacts/ArcProbe-0.2.2.ipa` is an unsigned iPhoneOS arm64 package. Import it into SideStore for signing and installation. It is not a pre-signed IPA. Direct installation is the intended path for Shortcuts; LiveContainer background-action discovery has not been verified.
 
 1. Open **Accounts & sync** and sign into the main account using the official login page. Confirm **Use signed-in account**, then run the full import. This account needs an active Arcaea Online subscription.
 2. Set up the **Recent account** independently. For now choose **Own account (testing)** and sign in with the same main account identity. The two sessions remain isolated.
@@ -47,6 +47,6 @@ xcodebuild test -project ArcaeaOffline.xcodeproj -scheme ArcaeaOffline \
 zsh scripts/package-ipa.sh
 ```
 
-Use an installed iOS 18+ simulator and a current Xcode supporting the deployment target. Packaging writes its build log under `build/package` and IPA/checksum under `artifacts`. See [release verification](docs/verification/arcprobe-0.2.1.md) for actual checks and untested device requirements. The website adapter is based on inspected official frontend contracts and synthetic regression fixtures; real authenticated app import is a separate acceptance test.
+Use an installed iOS 18+ simulator and a current Xcode supporting the deployment target. Packaging writes its build log under `build/package` and IPA/checksum under `artifacts`. See [release verification](docs/verification/arcprobe-0.2.2.md) for actual checks and untested device requirements. The website adapter is based on inspected official frontend contracts and synthetic regression fixtures; real authenticated app import is a separate acceptance test.
 
 See [notices](NOTICE.md) for metadata attribution. The sibling ArcPotApk project is a read-only reference and is not a build dependency.

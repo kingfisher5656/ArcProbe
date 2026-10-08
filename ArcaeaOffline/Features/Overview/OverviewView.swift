@@ -57,10 +57,10 @@ private struct BestScoreCard: View {
         VStack(alignment: .leading, spacing: 0) {
             CoverArtwork(chart: row.best.chartID).aspectRatio(1.2, contentMode: .fit)
                 .overlay(alignment: .topLeading) {
-                    Text(row.rank.map { "#\($0)" } ?? "Unrated").font(.headline).padding(9).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10)).padding(10)
+                    Text(row.rank.map { "#\($0)" } ?? "Unrated").font(.headline).padding(9).background(Color(.secondarySystemGroupedBackground).opacity(0.95), in: RoundedRectangle(cornerRadius: 10)).padding(10)
                 }
                 .overlay(alignment: .bottomTrailing) {
-                    ChartBadge(chart: row.best.chartID, level: model.catalog[row.best.chartID]?.level).background(.regularMaterial, in: Capsule()).padding(10)
+                    ChartBadge(chart: row.best.chartID, level: model.catalog[row.best.chartID]?.level).background(Color(.secondarySystemGroupedBackground).opacity(0.95), in: Capsule()).padding(10)
                 }
             VStack(alignment: .leading, spacing: 10) {
                 Text(model.title(row.best.chartID)).font(.headline).lineLimit(2)
@@ -72,7 +72,7 @@ private struct BestScoreCard: View {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("PLAY RATING").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                         Text(row.ratingUnits.map { RatingCalculator.display($0) } ?? "Unrated")
-                            .font(.system(.title, design: .rounded, weight: .bold)).monospacedDigit()
+                            .font(.system(.title2, design: .rounded, weight: .bold)).monospacedDigit()
                             .foregroundStyle(.purple).lineLimit(1).minimumScaleFactor(0.7)
                     }
                 }

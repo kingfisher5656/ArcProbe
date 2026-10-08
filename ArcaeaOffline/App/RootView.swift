@@ -43,19 +43,33 @@ struct ChartBadge: View {
 
 struct CoverArtwork: View {
     @Environment(ArchiveModel.self) private var model
+    @Environment(\.displayScale) private var displayScale
+    @State private var image: UIImage?
     let chart: ChartID
+    private struct Request: Equatable {
+        let identifiers: [String]
+        let pixels: Int
+        let revision: Int
+    }
     var body: some View {
-        let resources = LibraryResources.shared
-        let _ = resources.revision
         GeometryReader { proxy in
+            let identifiers = ["wiki:\(chart.songID):\(chart.difficulty.rawValue)"] + (model.catalog[chart]?.artworkIdentifier.map { [$0] } ?? [])
+            let pixels = Int(ceil(max(proxy.size.width, proxy.size.height) * displayScale / 128)) * 128
+            let request = Request(identifiers: identifiers, pixels: min(1536, max(128, pixels)), revision: LibraryResources.shared.revision)
             ZStack {
-                LinearGradient(colors: [chart.difficulty.color.opacity(0.7), .indigo.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                if let image = resources.image(chart: chart, officialIdentifier: model.catalog[chart]?.artworkIdentifier) {
+                if let image {
                     Image(uiImage: image).resizable().scaledToFill()
                 } else {
+                    LinearGradient(colors: [chart.difficulty.color.opacity(0.7), .indigo.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing)
                     Image(systemName: "waveform").font(.system(size: min(proxy.size.width, proxy.size.height) * 0.35, weight: .light)).foregroundStyle(.white.opacity(0.85))
                 }
             }.frame(width: proxy.size.width, height: proxy.size.height).clipped()
+                .task(id: request) {
+                    let loaded = await CoverImageLoader.shared.image(identifiers: request.identifiers, pixels: request.pixels, revision: request.revision)
+                    guard !Task.isCancelled else { return }
+                    image = loaded
+                }
+                .onDisappear { image = nil }
         }.accessibilityHidden(true)
     }
 }

@@ -26,7 +26,7 @@ struct SettingsView: View {
                 NavigationLink("Diagnostics") { DiagnosticsView() }
             } header: { Text("Backup and recovery") } footer: { Text("Backups include saved accounts, scores, corrections, deletion markers, and history. Passwords and session cookies are excluded. Restore validates the whole file, then asks you to confirm replacing the saved archive.") }
             Section("About") {
-                LabeledContent("App", value: "ArcProbe 0.2.1")
+                LabeledContent("App", value: "ArcProbe 0.2.2")
                 LabeledContent("Minimum version", value: "iOS / iPadOS 18")
                 Text("An unofficial, local score companion. This app reads account data and never uploads scores or modifies Arcaea.").font(.footnote).foregroundStyle(.secondary)
                 Text("Refresh chart constants and download official covers below your account settings. Cached covers remain available offline.").font(.footnote).foregroundStyle(.secondary)

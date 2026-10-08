@@ -184,12 +184,17 @@ enum WikiArtworkError: LocalizedError {
                             files[jacket.filePage] = bytes
                         }
                         try Task.checkCancellation()
-                        try LibraryResources.shared.saveWikiCover(bytes, chart: chart.id)
-                        saved += 1
+                        do {
+                            try LibraryResources.shared.saveWikiCover(bytes, chart: chart.id)
+                            saved += 1
+                        } catch LibraryResourceError.invalidImage {
+                            // A small or malformed original must not prevent later charts from downloading.
+                            skipped += 1
+                        }
                     }
                     try await Task.sleep(for: .seconds(1))
                 }
-                status = "Saved \(saved) chart covers. \(skipped) unmatched charts retain their existing artwork."
+                status = "Saved \(saved) chart covers. \(skipped) unmatched or unsupported charts retain their existing artwork."
             } catch is CancellationError { status = "Stopped. Completed covers are retained." }
             catch { status = error.localizedDescription }
         }

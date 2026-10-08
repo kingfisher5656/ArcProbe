@@ -4,6 +4,15 @@ import XCTest
 @testable import ArcaeaOffline
 
 @MainActor final class WikiArtworkTests: XCTestCase {
+    func testFiveHundredPixelOriginalIsAcceptedWithoutUpscaling() throws {
+        let chart = ChartID(songID: "lost-size-test-" + UUID().uuidString, difficulty: .future)
+        let format = UIGraphicsImageRendererFormat(); format.scale = 1
+        let original = UIGraphicsImageRenderer(size: CGSize(width: 500, height: 500), format: format).image { context in
+            UIColor.blue.setFill(); context.fill(CGRect(x: 0, y: 0, width: 500, height: 500))
+        }
+        try LibraryResources.shared.saveWikiCover(XCTUnwrap(original.pngData()), chart: chart)
+        XCTAssertEqual(LibraryResources.shared.image(chart: chart, officialIdentifier: nil)?.cgImage?.width, 500)
+    }
     func testBeyondJacketIsNeverUsedForBaseChart() throws {
         let base = WikiJacket(filePage: "https://arcaea.miraheze.org/wiki/File:Songs_vexaria.jpg", difficulties: "Past/Present/Future")
         let beyond = WikiJacket(filePage: "https://arcaea.miraheze.org/wiki/File:Songs_vexaria_byd.jpg", difficulties: "Beyond")

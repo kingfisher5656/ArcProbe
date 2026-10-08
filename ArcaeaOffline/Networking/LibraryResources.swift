@@ -94,7 +94,7 @@ struct PublicResourceLoader: Sendable {
               let source = CGImageSourceCreateWithData(data as CFData, nil),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let width = properties[kCGImagePropertyPixelWidth] as? Int, let height = properties[kCGImagePropertyPixelHeight] as? Int,
-              (512...4096).contains(width), (512...4096).contains(height),
+              (256...4096).contains(width), (256...4096).contains(height),
               UIImage(data: data) != nil else { throw LibraryResourceError.invalidImage }
         let key = wikiKey(chart)
         if let current = image(for: key), let cg = current.cgImage, min(cg.width, cg.height) > min(width, height) { return }

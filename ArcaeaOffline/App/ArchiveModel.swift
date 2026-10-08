@@ -79,7 +79,7 @@ final class ArchiveModel {
         let data = try ArchiveBackup(store: store).export()
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("ArcaeaOfflineExports", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let url = folder.appendingPathComponent("Arcaea-Offline-backup-\(Date().formatted(.iso8601.year().month().day().dateSeparator(.dash))).json")
+        let url = folder.appendingPathComponent("ArcProbe-backup-\(Date().formatted(.iso8601.year().month().day().dateSeparator(.dash))).json")
         try data.write(to: url, options: .atomic)
         return ShareFile(url: url)
     }

@@ -41,14 +41,29 @@ struct ChartBadge: View {
     }
 }
 
+struct CoverArtwork: View {
+    @Environment(ArchiveModel.self) private var model
+    let chart: ChartID
+    var body: some View {
+        let resources = LibraryResources.shared
+        let _ = resources.revision
+        GeometryReader { proxy in
+            ZStack {
+                LinearGradient(colors: [chart.difficulty.color.opacity(0.7), .indigo.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                if let image = resources.image(for: model.catalog[chart]?.artworkIdentifier) {
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else {
+                    Image(systemName: "waveform").font(.system(size: min(proxy.size.width, proxy.size.height) * 0.35, weight: .light)).foregroundStyle(.white.opacity(0.85))
+                }
+            }.frame(width: proxy.size.width, height: proxy.size.height).clipped()
+        }.accessibilityHidden(true)
+    }
+}
 struct CoverPlaceholder: View {
     let chart: ChartID
     var size: CGFloat = 64
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 10).fill(LinearGradient(colors: [chart.difficulty.color.opacity(0.7), .indigo.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing))
-            Image(systemName: "waveform").font(.system(size: size * 0.35, weight: .light)).foregroundStyle(.white.opacity(0.85))
-        }.frame(width: size, height: size).accessibilityHidden(true)
+        CoverArtwork(chart: chart).frame(width: size, height: size).clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
 

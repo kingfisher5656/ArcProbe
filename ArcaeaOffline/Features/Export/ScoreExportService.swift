@@ -32,7 +32,7 @@ struct ShareSheet: UIViewControllerRepresentable {
             UIColor(red: 0.95, green: 0.94, blue: 0.98, alpha: 1).setFill(); cg.fill(CGRect(origin: .zero, size: size))
             let purple = UIColor(red: 0.33, green: 0.22, blue: 0.48, alpha: 1)
             purple.setFill(); cg.fill(CGRect(x: 0, y: 0, width: 1800, height: 350))
-            text("ARCAEA OFFLINE", at: CGRect(x: 70, y: 52, width: 1600, height: 72), size: 50, color: .white, weight: .bold)
+            text("ARCPROBE", at: CGRect(x: 70, y: 52, width: 1600, height: 72), size: 50, color: .white, weight: .bold)
             text("BEST 50  /  \(model.selectedProfile?.displayName ?? model.selectedProfile?.id.rawValue ?? "Local archive")", at: CGRect(x: 74, y: 143, width: 1100, height: 62), size: 31, color: UIColor.white.withAlphaComponent(0.85), weight: .medium)
             text(model.ranking.map { RatingCalculator.display($0.potentialUnits) } ?? "—", at: CGRect(x: 1390, y: 115, width: 330, height: 88), size: 60, color: .white, weight: .semibold, align: .right)
             text("Saved-score potential · local estimate", at: CGRect(x: 1050, y: 220, width: 670, height: 55), size: 23, color: UIColor.white.withAlphaComponent(0.85), align: .right)
@@ -70,7 +70,7 @@ struct ShareSheet: UIViewControllerRepresentable {
     private static func write(_ data: Data, ext: String) throws -> ShareFile {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("ArcaeaOfflineExports", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let url = folder.appendingPathComponent("Arcaea-Offline-B50-\(UUID().uuidString.prefix(8)).\(ext)")
+        let url = folder.appendingPathComponent("ArcProbe-B50-\(UUID().uuidString.prefix(8)).\(ext)")
         try data.write(to: url, options: .atomic)
         return ShareFile(url: url)
     }

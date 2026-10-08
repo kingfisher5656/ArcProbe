@@ -16,8 +16,8 @@ trap 'rm -rf "$TASK_PACKAGE_DIR"' EXIT
 mkdir -p "$TASK_PACKAGE_DIR/Payload"
 ditto "$TASK_APP_PATH" "$TASK_PACKAGE_DIR/Payload/ArcaeaOffline.app"
 cd "$TASK_PACKAGE_DIR"
-zip -qry "$TASK_PACKAGE_DIR/Arcaea-Offline-0.1.0.ipa" Payload
-mv "$TASK_PACKAGE_DIR/Arcaea-Offline-0.1.0.ipa" "$TASK_PROJECT_ROOT/artifacts/Arcaea-Offline-0.1.0.ipa"
+zip -qry "$TASK_PACKAGE_DIR/ArcProbe-0.2.0.ipa" Payload
+mv "$TASK_PACKAGE_DIR/ArcProbe-0.2.0.ipa" "$TASK_PROJECT_ROOT/artifacts/ArcProbe-0.2.0.ipa"
 cd "$TASK_PROJECT_ROOT"
-shasum -a 256 artifacts/Arcaea-Offline-0.1.0.ipa > artifacts/Arcaea-Offline-0.1.0.ipa.sha256
-print 'Created artifacts/Arcaea-Offline-0.1.0.ipa. This unsigned device build requires SideStore re-signing; it is not device verified.'
+shasum -a 256 artifacts/ArcProbe-0.2.0.ipa > artifacts/ArcProbe-0.2.0.ipa.sha256
+print 'Created artifacts/ArcProbe-0.2.0.ipa. This unsigned device build requires SideStore re-signing; it is not device verified.'

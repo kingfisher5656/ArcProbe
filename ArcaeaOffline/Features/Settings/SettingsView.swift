@@ -18,16 +18,18 @@ struct SettingsView: View {
                 LabeledContent("Chart bests", value: String(model.bestScores.count))
             }
             AccountSettingsSections()
+            LibrarySettingsSection()
+            NotificationSettingsSection()
             Section {
                 Button("Export JSON backup", systemImage: "square.and.arrow.up") { model.perform { share = try model.backupFile() } }
                 Button("Restore JSON backup", systemImage: "square.and.arrow.down") { restoring = true }
                 NavigationLink("Diagnostics") { DiagnosticsView() }
             } header: { Text("Backup and recovery") } footer: { Text("Backups include saved accounts, scores, corrections, deletion markers, and history. Passwords and session cookies are excluded. Restore validates the whole file, then asks you to confirm replacing the saved archive.") }
             Section("About") {
-                LabeledContent("App", value: "Arcaea Offline 0.1.0")
+                LabeledContent("App", value: "ArcProbe 0.2.0")
                 LabeledContent("Minimum version", value: "iOS / iPadOS 18")
                 Text("An unofficial, local score companion. This app reads account data and never uploads scores or modifies Arcaea.").font(.footnote).foregroundStyle(.secondary)
-                Text("Chart constants are dated reference data. This build uses native cover placeholders. Chart titles and artists appear when supplied by official account data.").font(.footnote).foregroundStyle(.secondary)
+                Text("Refresh chart constants and download official covers below your account settings. Cached covers remain available offline.").font(.footnote).foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Accounts & sync")

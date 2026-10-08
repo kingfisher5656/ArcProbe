@@ -4,6 +4,9 @@ import Foundation
 
 struct ArcaeaOfflineShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
+        AppShortcut(intent: StartNotificationTrackingIntent(), phrases: ["Start notification tracking in \(.applicationName)"], shortTitle: "Start Notifications", systemImageName: "bell.badge")
+        AppShortcut(intent: StopNotificationTrackingIntent(), phrases: ["Stop notification tracking in \(.applicationName)"], shortTitle: "Stop Notifications", systemImageName: "bell.slash")
+        AppShortcut(intent: ProcessTrackingNotificationIntent(), phrases: ["Process tracking notification in \(.applicationName)"], shortTitle: "Process Notification", systemImageName: "arrow.clockwise")
         AppShortcut(intent: FetchRecentPlayIntent(), phrases: ["Fetch recent plays with \(.applicationName)"], shortTitle: "Fetch Recent Play", systemImageName: "arrow.clockwise")
         AppShortcut(intent: GetTrackingStatusIntent(), phrases: ["Get tracking status in \(.applicationName)"], shortTitle: "Tracking Status", systemImageName: "clock")
         AppShortcut(intent: SetTrackingActiveIntent(), phrases: ["Set tracking in \(.applicationName)"], shortTitle: "Set Tracking", systemImageName: "playpause")

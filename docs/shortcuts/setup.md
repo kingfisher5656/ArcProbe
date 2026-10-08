@@ -1,6 +1,6 @@
 # Shortcuts setup — experimental background tracking
 
-Install **Arcaea Offline directly through SideStore** and open the app once. Offline records and own-account recent testing work independently of a full import. For friend mode, connect the main account in the app so setup can select it; run a full import if desired and if it has Arcaea Online. LiveContainer foreground use does not prove that the guest app's actions are available in Shortcuts.
+Install **ArcProbe directly through SideStore** and open the app once. Offline records and own-account recent testing work independently of a full import. For friend mode, connect the main account in the app so setup can select it; run a full import if desired and if it has Arcaea Online. LiveContainer foreground use does not prove that the guest app's actions are available in Shortcuts.
 
 This build exposes Configure Recent Account, Set Tracking Active, Fetch Recent Play, and Get Tracking Status in the main app target. Fetch is one bounded invocation; it does not open the app, download artwork, import all scores, or run a waiting loop. Device discovery and background execution still require testing on the user's iPadOS 18.7.3 installation.
 
@@ -49,3 +49,20 @@ For **Arcaea Is Closed**, run Set Tracking Active with Active=false. Optionally 
 The loop is experimental. iPadOS can suspend Shortcuts; an App Opened trigger is not a repeating scheduler. Test a 30–60 minute play session, rapid close/reopen, lock/unlock, airplane mode, expired cookies, force-quit, and a SideStore signing refresh. Record actual invocation timestamps, missed intervals, and visible recent plays. Simulator tests do not establish reliable 60–80 second capture while Arcaea is in front.
 
 One-shot fetch and fetch-on-open/close are explicit fallbacks. They do not satisfy continuous 60–80 second collection if the loop is suspended. Disconnecting or replacing either login retains archived scores; replacing the recent account resets its displayed tracking dates/generation while preserving any server cooldown.
+
+
+## iOS 27 notification method (experimental)
+
+Keep the original iOS 18 Repeat/Wait recipe above for the current iPad. Do not run both methods concurrently: they share the tracking generation and request cooldown.
+
+1. In ArcProbe Settings, configure the recent account, choose the minimum/maximum notification interval (default 65–80 seconds), save it, then enable notifications.
+2. Create an **Arcaea Is Opened** automation that runs **Start Notification Tracking** once.
+3. Create an iOS 27 **Notification** automation for **ArcProbe**, filtering Title to **ArcProbe tracking pulse**. Choose immediate execution when available. Add **Process Tracking Notification** and set **Notification Message** to the received notification's Message/body variable. Do not type a generation or token manually and do not use the notification title. No Repeat or Wait is needed.
+4. Create an **Arcaea Is Closed** automation running **Stop Notification Tracking**. A suitable Focus-off automation is an optional experiment; Game Mode and Focus are different controls.
+5. Allow immediate ArcProbe notification delivery during gaming. Verify the next pulse and a fresh recent fetch on the device.
+
+Each pulse contains a single-use token. Processing it schedules one successor, then runs the existing bounded recent fetch. Duplicate, old-session and stopped-session pulses cannot renew the chain. Stop cancels the pending pulse. Authentication or schema failures end the chain so the account can be repaired in-app. Rate limits still apply.
+
+The chain can renew indefinitely while iOS runs each notification automation. It does not keep the app running forever, and it cannot renew itself if the automation is not invoked. Restart notification tracking after interrupted delivery. The four-minute automation limit motivating this method is user-reported; physical iOS 27 validation remains outstanding.
+
+Apple documents the [iOS 27 Notification automation trigger](https://support.apple.com/guide/shortcuts/event-triggers-apd932ff833f/10.0/ios/27) and [local notification scheduling](https://developer.apple.com/documentation/usernotifications/scheduling-a-notification-locally-from-your-app).

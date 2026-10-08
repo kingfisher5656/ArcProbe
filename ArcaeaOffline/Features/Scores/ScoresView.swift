@@ -3,16 +3,21 @@ import SwiftUI
 
 struct ScoresView: View {
     @Environment(ArchiveModel.self) private var model
+    @State private var ratingOrder = false
     @State private var query = ""
     @State private var difficulty: Difficulty?
     @State private var editor: ScoreEditorDestination?
     private var filtered: [BestScore] {
-        model.bestScores.filter { (difficulty == nil || $0.chartID.difficulty == difficulty) && (query.isEmpty || model.title($0.chartID).localizedCaseInsensitiveContains(query) || $0.chartID.songID.localizedCaseInsensitiveContains(query)) }
-            .sorted { model.title($0.chartID).localizedStandardCompare(model.title($1.chartID)) == .orderedAscending }
+        let candidates = ratingOrder ? (model.ranking?.rows.map(\.best) ?? model.bestScores) : model.bestScores.sorted {
+            let comparison = model.title($0.chartID).localizedStandardCompare(model.title($1.chartID))
+            return comparison == .orderedSame ? $0.chartID.songID + String($0.chartID.difficulty.rawValue) < $1.chartID.songID + String($1.chartID.difficulty.rawValue) : comparison == .orderedAscending
+        }
+        return candidates.filter { (difficulty == nil || $0.chartID.difficulty == difficulty) && (query.isEmpty || model.title($0.chartID).localizedCaseInsensitiveContains(query) || $0.chartID.songID.localizedCaseInsensitiveContains(query)) }
     }
     var body: some View {
         List {
             Section {
+                Picker("Sort by", selection: $ratingOrder) { Text("Name").tag(false); Text("Play rating").tag(true) }
                 Picker("Difficulty", selection: $difficulty) { Text("All").tag(Difficulty?.none); ForEach(Difficulty.allCases, id: \.self) { Text($0.label).tag(Optional($0)) } }.pickerStyle(.segmented)
             }
             Section("\(filtered.count) chart bests") {

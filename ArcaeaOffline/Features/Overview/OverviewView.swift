@@ -23,7 +23,7 @@ struct OverviewView: View {
                 }
             }.padding(24).frame(maxWidth: 1450)
         }
-        .background(Color(.systemGroupedBackground)).navigationTitle("Arcaea Offline")
+        .background(Color(.systemGroupedBackground)).navigationTitle("ArcProbe")
         .toolbar {
             if !(model.ranking?.rows.isEmpty ?? true) {
                 Menu {
@@ -54,12 +54,21 @@ private struct BestScoreCard: View {
     @Environment(ArchiveModel.self) private var model
     let row: RankedScore
     var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack { Text(row.rank.map { "#\($0)" } ?? "Unrated").font(.headline).foregroundStyle(.secondary); Spacer(); ChartBadge(chart: row.best.chartID, level: model.catalog[row.best.chartID]?.level) }
-            HStack(spacing: 12) { CoverPlaceholder(chart: row.best.chartID, size: 66); VStack(alignment: .leading, spacing: 4) { Text(model.title(row.best.chartID)).font(.headline).lineLimit(2); if let artist = model.artist(row.best.chartID) { Text(artist).font(.caption).foregroundStyle(.secondary).lineLimit(1) } } }
-            HStack { Text(DisplayFormat.score(row.best.values.score)).font(.title3.weight(.semibold).monospacedDigit()); Spacer(); Text(DisplayFormat.grade(row.best.values.score)).font(.subheadline.bold()).foregroundStyle(.purple) }
-            HStack { Text(DisplayFormat.clear(row.best.bestClear)); Spacer(); Text(row.ratingUnits.map { RatingCalculator.display($0) } ?? "Unrated").fontWeight(.semibold).monospacedDigit() }.font(.caption).foregroundStyle(.secondary)
-            if row.best.isOverridden || row.best.isBestCorrection { Label("Manual correction", systemImage: "pencil").font(.caption).foregroundStyle(.orange) }
-        }.padding(16).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
+        VStack(alignment: .leading, spacing: 0) {
+            CoverArtwork(chart: row.best.chartID).aspectRatio(1.2, contentMode: .fit)
+                .overlay(alignment: .topLeading) {
+                    Text(row.rank.map { "#\($0)" } ?? "Unrated").font(.headline).padding(9).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10)).padding(10)
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    ChartBadge(chart: row.best.chartID, level: model.catalog[row.best.chartID]?.level).background(.regularMaterial, in: Capsule()).padding(10)
+                }
+            VStack(alignment: .leading, spacing: 10) {
+                Text(model.title(row.best.chartID)).font(.headline).lineLimit(2)
+                if let artist = model.artist(row.best.chartID) { Text(artist).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                HStack { Text(DisplayFormat.score(row.best.values.score)).font(.title3.weight(.semibold).monospacedDigit()); Spacer(); Text(DisplayFormat.grade(row.best.values.score)).font(.subheadline.bold()).foregroundStyle(.purple) }
+                HStack { Text(DisplayFormat.clear(row.best.bestClear)); Spacer(); Text(row.ratingUnits.map { RatingCalculator.display($0) } ?? "Unrated").fontWeight(.semibold).monospacedDigit() }.font(.caption).foregroundStyle(.secondary)
+                if row.best.isOverridden || row.best.isBestCorrection { Label("Manual correction", systemImage: "pencil").font(.caption).foregroundStyle(.orange) }
+            }.padding(16)
+        }.background(Color(.secondarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 18))
     }
 }

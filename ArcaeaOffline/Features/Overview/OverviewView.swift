@@ -66,7 +66,16 @@ private struct BestScoreCard: View {
                 Text(model.title(row.best.chartID)).font(.headline).lineLimit(2)
                 if let artist = model.artist(row.best.chartID) { Text(artist).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
                 HStack { Text(DisplayFormat.score(row.best.values.score)).font(.title3.weight(.semibold).monospacedDigit()); Spacer(); Text(DisplayFormat.grade(row.best.values.score)).font(.subheadline.bold()).foregroundStyle(.purple) }
-                HStack { Text(DisplayFormat.clear(row.best.bestClear)); Spacer(); Text(row.ratingUnits.map { RatingCalculator.display($0) } ?? "Unrated").fontWeight(.semibold).monospacedDigit() }.font(.caption).foregroundStyle(.secondary)
+                HStack(alignment: .bottom) {
+                    Text(DisplayFormat.clear(row.best.bestClear)).font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("PLAY RATING").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                        Text(row.ratingUnits.map { RatingCalculator.display($0) } ?? "Unrated")
+                            .font(.system(.title, design: .rounded, weight: .bold)).monospacedDigit()
+                            .foregroundStyle(.purple).lineLimit(1).minimumScaleFactor(0.7)
+                    }
+                }
                 if row.best.isOverridden || row.best.isBestCorrection { Label("Manual correction", systemImage: "pencil").font(.caption).foregroundStyle(.orange) }
             }.padding(16)
         }.background(Color(.secondarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 18))

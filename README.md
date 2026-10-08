@@ -16,13 +16,13 @@ Official history and local estimates stay separate. Constants are a dated snapsh
 
 ## Install and configure
 
-The generated `artifacts/ArcProbe-0.2.0.ipa` is an unsigned iPhoneOS arm64 package. Import it into SideStore for signing and installation. It is not a pre-signed IPA. Direct installation is the intended path for Shortcuts; LiveContainer background-action discovery has not been verified.
+The generated `artifacts/ArcProbe-0.2.1.ipa` is an unsigned iPhoneOS arm64 package. Import it into SideStore for signing and installation. It is not a pre-signed IPA. Direct installation is the intended path for Shortcuts; LiveContainer background-action discovery has not been verified.
 
 1. Open **Accounts & sync** and sign into the main account using the official login page. Confirm **Use signed-in account**, then run the full import. This account needs an active Arcaea Online subscription.
 2. Set up the **Recent account** independently. For now choose **Own account (testing)** and sign in with the same main account identity. The two sessions remain isolated.
 3. Later, connect a burner account that is already friends with the main account, select **Friend target (burner)**, and configure it again. The connected main account supplies the target identity.
 4. Configure automatic renewal in the app or using the setup Shortcut action. Credentials are held in the device Keychain; remove literal passwords from the saved setup Shortcut afterward. Recurring fetches do not take passwords.
-5. In **Chart data & cover art**, refresh constants and download missing official covers after importing scores. Artwork requests use lowiro’s asset server without sending login cookies. Keep the app open while downloading; completed covers survive cancellation.
+5. In **Chart data & cover art**, refresh constants and download missing official covers after importing scores. For larger originals, choose **Download sharper wiki covers**, then start the download in the wiki screen. The app follows song articles and original-file links, checks song IDs and difficulty labels, and keeps Beyond artwork separate. Keep that screen open. Unmatched charts retain official covers. Artwork requests use separate sessions without account login cookies. Keep the app open while downloading; completed covers survive cancellation.
 6. Follow the in-app **Shortcut setup instructions** and [detailed recipes](docs/shortcuts/setup.md).
 
 The app does not schedule a guaranteed minute-by-minute background task. A bounded Shortcut loop can request a fetch about every 70 seconds, but iPadOS may suspend it. Each request respects a 60-second minimum and server cooldowns. Sustained timing, SideStore action discovery and burner access require testing on the physical iPad. If a website challenge appears, open the role's official login in the app; repeated automated login is not attempted.
@@ -47,6 +47,6 @@ xcodebuild test -project ArcaeaOffline.xcodeproj -scheme ArcaeaOffline \
 zsh scripts/package-ipa.sh
 ```
 
-Use an installed iOS 18+ simulator and a current Xcode supporting the deployment target. Packaging writes its build log under `build/package` and IPA/checksum under `artifacts`. See [release verification](docs/verification/arcprobe-0.2.0.md) for actual checks and untested device requirements. The website adapter is based on inspected official frontend contracts and synthetic regression fixtures; real authenticated app import is a separate acceptance test.
+Use an installed iOS 18+ simulator and a current Xcode supporting the deployment target. Packaging writes its build log under `build/package` and IPA/checksum under `artifacts`. See [release verification](docs/verification/arcprobe-0.2.1.md) for actual checks and untested device requirements. The website adapter is based on inspected official frontend contracts and synthetic regression fixtures; real authenticated app import is a separate acceptance test.
 
 See [notices](NOTICE.md) for metadata attribution. The sibling ArcPotApk project is a read-only reference and is not a build dependency.

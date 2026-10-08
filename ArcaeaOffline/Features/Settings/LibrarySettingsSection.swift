@@ -3,6 +3,7 @@ import SwiftUI
 
 struct LibrarySettingsSection: View {
     @Environment(ArchiveModel.self) private var model
+    @State private var wiki = false
     private var resources: LibraryResources { .shared }
     var body: some View {
         Section {
@@ -10,6 +11,7 @@ struct LibrarySettingsSection: View {
             Button(resources.refreshingConstants ? "Refreshing constants…" : "Refresh chart constants") {
                 Task { do { try await resources.refreshConstants(store: model.store); try model.reload() } catch { model.errorMessage = error.localizedDescription } }
             }.disabled(resources.refreshingConstants)
+            Button("Download sharper wiki covers") { wiki = true }
             Button("Download missing official covers") { resources.downloadCovers(charts: Array(model.catalog.charts.values)) }.disabled(resources.downloading)
             Button("Refresh downloaded covers") { resources.downloadCovers(charts: Array(model.catalog.charts.values), refresh: true) }.disabled(resources.downloading)
             if resources.downloading {
@@ -18,7 +20,8 @@ struct LibrarySettingsSection: View {
             }
             if let message = resources.message { Text(message).font(.footnote).foregroundStyle(.secondary) }
         } header: { Text("Chart data & cover art") } footer: {
-            Text("Constants come from the Arcaea community wiki on Miraheze. Covers use the artwork identifiers supplied by your main account’s score import and are downloaded from lowiro’s asset server. Import scores first, then download covers for offline use. Missing artwork keeps a placeholder.")
+            Text("Constants come from the Arcaea community wiki on Miraheze. Covers use the artwork identifiers supplied by your main account’s score import and are downloaded from lowiro’s asset server. Import scores first. Sharper wiki covers use original files with matching song IDs and difficulty labels; official images remain the fallback. Downloaded covers work offline.")
         }
+        .sheet(isPresented: $wiki) { WikiArtworkView() }
     }
 }

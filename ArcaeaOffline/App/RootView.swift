@@ -50,7 +50,7 @@ struct CoverArtwork: View {
         GeometryReader { proxy in
             ZStack {
                 LinearGradient(colors: [chart.difficulty.color.opacity(0.7), .indigo.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                if let image = resources.image(for: model.catalog[chart]?.artworkIdentifier) {
+                if let image = resources.image(chart: chart, officialIdentifier: model.catalog[chart]?.artworkIdentifier) {
                     Image(uiImage: image).resizable().scaledToFill()
                 } else {
                     Image(systemName: "waveform").font(.system(size: min(proxy.size.width, proxy.size.height) * 0.35, weight: .light)).foregroundStyle(.white.opacity(0.85))

@@ -84,6 +84,25 @@ struct PublicResourceLoader: Sendable {
         memory.setObject(image, forKey: key, cost: Int(image.size.width * image.size.height * 4))
         return image
     }
+    private func wikiKey(_ chart: ChartID) -> String { "wiki:\(chart.songID):\(chart.difficulty.rawValue)" }
+    func hasWikiCover(_ chart: ChartID) -> Bool { image(for: wikiKey(chart)) != nil }
+    func image(chart: ChartID, officialIdentifier: String?) -> UIImage? {
+        image(for: wikiKey(chart)) ?? image(for: officialIdentifier)
+    }
+    func saveWikiCover(_ data: Data, chart: ChartID) throws {
+        guard data.count <= 8 * 1024 * 1024,
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int, let height = properties[kCGImagePropertyPixelHeight] as? Int,
+              (512...4096).contains(width), (512...4096).contains(height),
+              UIImage(data: data) != nil else { throw LibraryResourceError.invalidImage }
+        let key = wikiKey(chart)
+        if let current = image(for: key), let cg = current.cgImage, min(cg.width, cg.height) > min(width, height) { return }
+        // Preserve the original image bytes; do not upscale or re-encode a thumbnail.
+        try data.write(to: file(key), options: .atomic)
+        memory.removeObject(forKey: Self.coverKey(key) as NSString)
+        revision += 1
+    }
     func refreshConstants(store: ArchiveStore) async throws {
         guard !refreshingConstants else { return }
         refreshingConstants = true; defer { refreshingConstants = false }

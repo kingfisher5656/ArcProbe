@@ -1,6 +1,6 @@
 # Arcaea Offline Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task, or superpowers:subagent-driven-development if the user selects delegation. Steps use checkbox syntax for tracking. This plan is proposed, not approval to begin implementation.
+> **For agentic workers:** User approved implementation on 2026-10-07 and selected GPT-6.1 Sol, Extra High reasoning, for coding with parent engineering review. Use superpowers:subagent-driven-development. Steps use checkbox syntax for tracking.
 
 **Goal:** Deliver a native offline Arcaea score archive with full main-account import, manual corrections, and cookie-reusing recent-play Shortcuts for a separate burner account.
 
@@ -10,15 +10,21 @@
 
 **Spec:** `../specs/2026-10-07-arcaea-offline-design.md` (read together with this plan).
 
+## Implementation status — 2026-10-08
+
+The user approved implementation and delegated coding to Sol Extra High engineers. The native app and shared core are implemented, integrated and independently verified with 63 core, 18 app and 2 UI tests. A Release arm64 IPA is packaged for SideStore re-signing. See `../../verification/release.md` for exact evidence and checksum.
+
+The original checklists below retain the complete acceptance scope: mixed implementation/device-test items are not marked fully complete merely because their code exists. Physical installation, live authenticated import/recent access and sustained polling remain pending. Optional official artwork download/cache was deferred; the delivered UI and exports use disclosed placeholders. No feasibility-probe IPA was delivered separately; the integrated test IPA is the concrete device-validation artifact.
+
 ## Global constraints
 
 - Product/display name: **Arcaea Offline**.
 - Deployment target: iOS/iPadOS 18.0; primary acceptance device: iPadOS 18.7.3.
 - All new files and outputs under `/Users/familymac/Documents/Codex projects/Arcaea Offline`; ArcPotApk remains read-only.
 - No root integration, game-file access, game modification, or score uploads.
-- Main-account import is in-app. Recurring Shortcuts use the burner account only.
+- Main-account import is in-app. Recurring Shortcuts use an isolated recent-fetch login role; user authorizes the main account in this role for temporary own-account testing before obtaining a burner.
 - Target 70-second polling; minimum 60 seconds between attempts; never override server cooldowns. Sustained timing is conditional on physical-device evidence.
-- No IPA or application implementation until the user has reviewed the plan.
+- Plan reviewed and implementation authorized. Physical iPad/SideStore and actual burner-account verification must remain labeled pending until performed.
 
 ## Review focus
 
@@ -153,6 +159,6 @@ Create `ArcaeaOffline.xcodeproj`, `ArcaeaOffline/App/`, `ArcaeaOffline/Features/
 - [ ] Actual 60–80-second behavior is measured on the user's iPad and honestly labeled; any deviation is an explicit accepted limitation.
 - [ ] UI and package name are Arcaea Offline; ArcPotApk has not been modified.
 
-## Proposed execution method
+## Execution method
 
-Implement sequentially in this chat, with the feasibility gate first. This keeps the shared authentication, archive and Shortcut decisions consistent. Delegated implementation is optional if the user prefers it. Review the proposed design and plan before implementation; no implementation or IPA generation has occurred in this planning stage.
+Following approval, three Sol Extra High engineers implemented bounded core, networking/tracking, and native iOS tasks in this chat. The lead engineer reviewed their source, delegated corrections, ran the final independent suites, reviewed visual outputs and packaged the device IPA. Physical-device feasibility remains an explicit acceptance boundary rather than an inferred Simulator result.

@@ -1,6 +1,31 @@
 # ArcProbe
 
-An unofficial native iPhone/iPad score archive for iOS 18 or later. The primary installation target is a direct SideStore installation on iPadOS 18.7.3.
+iPadOS에서 구동되는 아르케아 점수 기록/관리 어플입니다. 현재 다음과 같은 기능을 지원합니다.
+- Arcaea Online과의 점수, B50, 포텐 그래프 동기화
+- 별도의 친구 계정 및 iOS 자동화를 통한 아르케아 최근 기록 자동으로 불러오기
+- B50 포텐 계산, 점수 관리 및 포텐 그래프 표시
+
+해당 프로젝트 내의 모든 코드는 AI를 통해 생성되었으며, 제작자는 해당 프로젝트를 유지관리할 능력을 갖추고 있지 못합니다.
+실용적인 프로그램이라기보다 무엇이 가능한지 실증하는 테스트형태의 프로그램으로 봐주시길 부탁드립니다.
+
+ArcProbe의 기능은 iPadOS 18에서 테스트되었습니다. iPadOS 27에서는 단축어 및 자동화 작동 방식의 변경으로 인해 오작동할 수 있습니다.
+
+## 설치 및 사용법
+
+- Sidestore를 통해 Releases의 IPA 파일을 설치 (Livecontainer 내 설치는 지원하지 않음)
+- 설치 후, ArcProbe 앱 내 Settings - Main Account 탭에서 Arcaea Online에 구독된 주 사용 계정 로그인
+- Import all scores and five-year history 버튼을 눌러 Arcaea Online과 기록 동기화
+- 앱 내 Settings - Recent Account, Separate Session 탭에서 Recent source를 Friend target (burner)로 선택
+- Settings - Recent Account, Separate Session 탭에서 주 사용 계정을 친구로 등록한 별도의 계정 로그인
+- 해당 단축어를 다운받음: https://www.icloud.com/shortcuts/b80ac073eddb41ed8a43ab7d29efcd69
+- 위 단축어를 자동화의 'Arcaea' 앱이 열릴 때에 할당함
+- 해당 단축어를 다운받음: https://www.icloud.com/shortcuts/a571bcf2072445fa9e807a892316b545
+- 위 단축어를 자동화의 'Arcaea' 앱이 닫힐 때에 할당함
+
+위 과정을 거치면 Arcaea가 열린 후 65~80초에 한번씩 아르케아 서버에서 최근 기록을 가져오는 단축어가 실행되며, Arcaea 종료 시 단축어가 종료됩니다.
+최근 기록은 ArcProbe 어플 내에 기록됩니다.
+
+아래는 챗GPT가 자동으로 생성한 Readme 파일입니다.
 
 ## Included
 

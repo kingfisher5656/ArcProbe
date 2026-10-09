@@ -65,6 +65,7 @@ public final class ArchiveStore: @unchecked Sendable {
                         points += 1
                     }
                 }
+                try capturePotentialBaseline(batch)
                 let receipt = ImportReceipt(accountID: batch.profile.id, kind: batch.kind, importedAt: batch.importedAt,
                     addedCount: added, duplicateCount: duplicate, addedPotentialCount: points)
                 try putReceipt(receipt)

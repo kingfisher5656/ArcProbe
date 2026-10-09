@@ -157,14 +157,19 @@ import WebKit
         recentProfile = account.profile; recentConfiguration = configuration; trackingStatus = try tracking.status(); lastError = nil
     }
 
-    func fetchRecent(generation: UUID? = nil) async -> FetchResult {
-        let result = await recent.fetch(generation: generation)
+    func fetchRecent(generation: UUID? = nil, finalFetch: Bool = false) async -> FetchResult {
+        let result = await recent.fetch(generation: generation, finalFetch: finalFetch)
         await refreshStatus()
         return result
     }
     @discardableResult func startTracking() throws -> UUID {
         let generation = try tracking.start(); trackingStatus = try tracking.status(); return generation
     }
+    func setMinimumIntervalEnabled(_ enabled: Bool) throws {
+        try tracking.setMinimumIntervalEnabled(enabled)
+        trackingStatus = try tracking.status()
+    }
+
     func stopTracking() throws { try tracking.stop(); trackingStatus = try tracking.status() }
     func status() throws -> TrackingStatus { try tracking.status() }
 

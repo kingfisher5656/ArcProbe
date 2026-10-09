@@ -18,6 +18,7 @@ internal struct ArchivePayload: Codable {
     var potentialPoints: [PotentialPoint]
     var receipts: [ImportReceipt]
     var undoRecords: [ManualUndoRecord]
+    var potentialBaselines: [PotentialBaseline]? = nil
 }
 
 public struct ArchiveBackup: Sendable {
@@ -43,7 +44,8 @@ public struct ArchiveBackup: Sendable {
                     bestCorrections: try store.records("SELECT payload FROM best_corrections ORDER BY account_id, song_id, difficulty"),
                     potentialPoints: try store.records("SELECT payload FROM potential_points ORDER BY account_id, series, source_id"),
                     receipts: try store.records("SELECT payload FROM receipts ORDER BY id"),
-                    undoRecords: try store.records("SELECT payload FROM manual_undo ORDER BY sequence"))
+                    undoRecords: try store.records("SELECT payload FROM manual_undo ORDER BY sequence"),
+                    potentialBaselines: try store.records("SELECT payload FROM potential_baselines ORDER BY account_id"))
                 let data = try store.encoder.encode(payload)
                 guard data.count <= Self.maximumBytes else { throw ArchiveError.oversizedBackup }
                 return data
@@ -66,7 +68,7 @@ public struct ArchiveBackup: Sendable {
         return try store.locked {
             try store.database.transaction {
                 try cancellationCheck()
-                for table in ["manual_undo", "overrides", "suppressions", "best_corrections", "observation_aliases", "observation_captures", "observations", "potential_points", "receipts", "charts", "profiles"] {
+                for table in ["potential_baselines", "manual_undo", "overrides", "suppressions", "best_corrections", "observation_aliases", "observation_captures", "observations", "potential_points", "receipts", "charts", "profiles"] {
                     try store.database.execute("DELETE FROM \(table)")
                 }
                 try cancellationCheck()
@@ -81,6 +83,9 @@ public struct ArchiveBackup: Sendable {
                 // Canonical insertion creates a first capture; replace with the exact backed-up evidence.
                 try store.database.execute("DELETE FROM observation_captures")
                 for capture in payload.captures { try cancellationCheck(); try store.putCapture(capture) }
+                for baseline in payload.potentialBaselines ?? [] {
+                    try store.putPotentialBaseline(baseline)
+                }
                 for value in payload.overrides { try cancellationCheck(); try store.setOverride(value.observationID, value.values) }
                 for marker in payload.suppressions { try cancellationCheck(); try store.setSuppression(marker.observationID, marker) }
                 for correction in payload.bestCorrections {
@@ -159,6 +164,15 @@ public struct ArchiveBackup: Sendable {
             guard profiles.contains(point.accountID) else { throw ArchiveError.accountMismatch }
             try ArchiveValidation.potential(point)
         }
+        let baselines = payload.potentialBaselines ?? []
+        guard baselines.count <= payload.profiles.count else { throw ArchiveError.oversizedBackup }
+        try unique(baselines.map(\.accountID))
+        for baseline in baselines {
+            guard profiles.contains(baseline.accountID), payload.potentialPoints.contains(baseline.anchor) else {
+                throw ArchiveError.invalidRecord("Potential baseline has no official anchor")
+            }
+            try baseline.validate()
+        }
         for receipt in payload.receipts {
             if let account = receipt.accountID, !profiles.contains(account) { throw ArchiveError.accountMismatch }
             try ArchiveValidation.date(receipt.importedAt)
@@ -196,6 +210,11 @@ public struct ArchiveBackup: Sendable {
     private func validateCorrection(_ correction: BestCorrection, profiles: Set<AccountID>,
                                     observations: [ObservationID: ScoreObservation], catalog: ChartCatalog) throws {
         guard profiles.contains(correction.accountID) else { throw ArchiveError.accountMismatch }
+        if let date = correction.recordedAt {
+            guard date.timeIntervalSince1970.isFinite, (0...253_402_300_799).contains(date.timeIntervalSince1970) else {
+                throw ArchiveError.invalidRecord("Invalid correction date")
+            }
+        }
         try ArchiveValidation.chartID(correction.chartID)
         try ArchiveValidation.values(correction.values, metadata: catalog[correction.chartID])
         for id in correction.baselineIDs {

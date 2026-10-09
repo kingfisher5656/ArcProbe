@@ -60,7 +60,7 @@ extension ArchiveStore {
                     try ArchiveValidation.values(values, metadata: catalog[chart])
                     let previous = try correction(account, chart)
                     let source: [ScoreObservation] = try records("SELECT payload FROM observations WHERE account_id=? AND song_id=? AND difficulty=?", correctionKey(account, chart))
-                    try setCorrection(account, chart, BestCorrection(accountID: account, chartID: chart, values: values, baselineIDs: Set(source.map(\.id))))
+                    try setCorrection(account, chart, BestCorrection(accountID: account, chartID: chart, values: values, baselineIDs: Set(source.map(\.id)), recordedAt: Date()))
                     state = .correction(account, chart, previous)
                 case .resetBestCorrection(let account, let chart):
                     try requireProfile(account); try ArchiveValidation.chartID(chart)

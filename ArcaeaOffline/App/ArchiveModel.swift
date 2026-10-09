@@ -13,6 +13,8 @@ final class ArchiveModel {
     var recentObservations: [EffectiveObservation] { observations.filter { captureSources[$0.original.id]?.contains(.officialRecent) == true || $0.original.source == .officialRecent } }
     var bestScores: [BestScore] = []
     var officialHistory: [PotentialPoint] = []
+    var localHistory: [PotentialPoint] = []
+    var potentialSyncDate: Date?
     private(set) var revision = 0
     var ranking: RankingSnapshot?
     var errorMessage: String?
@@ -30,11 +32,13 @@ final class ArchiveModel {
         catalog = try store.chartCatalog()
         if selectedAccountID == nil || !profiles.contains(where: { $0.id == selectedAccountID }) { selectedAccountID = profiles.first?.id }
         undoToken = try store.latestUndoToken()
-        guard let account = selectedAccountID else { observations = []; bestScores = []; officialHistory = []; captureSources = [:]; ranking = nil; return }
+        guard let account = selectedAccountID else { observations = []; bestScores = []; officialHistory = []; localHistory = []; potentialSyncDate = nil; captureSources = [:]; ranking = nil; return }
         observations = try store.observations(accountID: account)
         captureSources = try store.captureSources(accountID: account)
         bestScores = try store.bestScores(accountID: account)
         officialHistory = try store.potentialHistory(accountID: account).sorted { ($0.timestamp.date ?? .distantPast) < ($1.timestamp.date ?? .distantPast) }
+        potentialSyncDate = try store.potentialBaseline(accountID: account)?.syncedAt
+        localHistory = try store.localPotentialHistory(accountID: account)
         ranking = try RatingCalculator(catalog: catalog).rank(bestScores: bestScores)
     }
     func save(_ draft: ScoreDraft, editing observationID: ObservationID? = nil, correctingBest: Bool = false) throws {

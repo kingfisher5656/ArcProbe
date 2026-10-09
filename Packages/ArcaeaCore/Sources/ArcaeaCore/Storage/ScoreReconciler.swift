@@ -5,6 +5,7 @@ internal struct BestCorrection: Hashable, Codable, Sendable {
     let chartID: ChartID
     let values: ScoreValues
     let baselineIDs: Set<ObservationID>
+    var recordedAt: Date? = nil
 }
 
 internal enum ScoreReconciler {

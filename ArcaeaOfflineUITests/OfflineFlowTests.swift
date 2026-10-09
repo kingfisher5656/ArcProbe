@@ -39,6 +39,12 @@ import XCTest
         let detail = XCTAttachment(screenshot: app.screenshot()); detail.name = "Offline edited score details"; detail.lifetime = .keepAlways; add(detail)
         select("Best 50", app: app)
         let dashboard = XCTAttachment(screenshot: app.screenshot()); dashboard.name = "Offline Best 50 dashboard"; dashboard.lifetime = .keepAlways; add(dashboard)
+        select("Potential", app: app)
+        XCTAssertTrue(app.staticTexts["No history in this range"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Local · Best 50"].exists)
+        XCTAssertTrue(app.staticTexts["Official"].exists)
+        XCTAssertTrue(app.staticTexts["Local estimate"].exists)
+        let graph = XCTAttachment(screenshot: app.screenshot()); graph.name = "Official history without fabricated past"; graph.lifetime = .keepAlways; add(graph)
     }
     func testInvalidScoreShowsValidationAndDoesNotDismissEditor() {
         let app = XCUIApplication()
@@ -48,7 +54,41 @@ import XCTest
         XCTAssertTrue(app.staticTexts["validationMessage"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["saveScore"].exists)
     }
+    func testMinimumIntervalSettingPersistsAcrossRelaunch() {
+        let app = XCUIApplication()
+        app.launchEnvironment["ARCAEA_TEST_ARCHIVE"] = UUID().uuidString
+        app.launch(); select("Settings", app: app)
+        let toggle = app.switches["minimumFetchInterval"].firstMatch
+        for _ in 0..<5 {
+            if toggle.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(toggle.isHittable)
+        XCTAssertEqual(toggle.value as? String, "1")
+        toggle.switches.firstMatch.tap()
+        XCTAssertEqual(toggle.value as? String, "0")
+        app.terminate(); app.launch(); select("Settings", app: app)
+        for _ in 0..<5 {
+            if toggle.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertEqual(toggle.value as? String, "0")
+        toggle.switches.firstMatch.tap()
+        XCTAssertEqual(toggle.value as? String, "1")
+    }
+
     private func select(_ name: String, app: XCUIApplication) {
+        // Sidebar destinations are cells, unlike the compact tab bar's buttons.
+        if name == "Settings" {
+            let cell = app.cells[name].firstMatch
+            if !cell.exists, app.buttons["Toggle sidebar"].exists {
+                app.buttons["Toggle sidebar"].tap()
+            }
+            XCTAssertTrue(cell.waitForExistence(timeout: 10))
+            cell.tap()
+            if app.buttons["Hide Sidebar"].exists { app.buttons["Hide Sidebar"].tap() }
+            return
+        }
         let button = app.buttons[name].firstMatch
         XCTAssertTrue(button.waitForExistence(timeout: 10))
         button.tap()

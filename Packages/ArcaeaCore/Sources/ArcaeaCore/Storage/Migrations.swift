@@ -1,7 +1,7 @@
 import Foundation
 
 internal enum Migrations {
-    static let currentVersion = 3
+    static let currentVersion = 4
     static func run(_ db: ArchiveDatabase) throws {
         try db.transaction {
             let version = Int(try db.integer("PRAGMA user_version") ?? 0)
@@ -30,6 +30,10 @@ internal enum Migrations {
             if version < 3 {
                 try db.execute("CREATE TABLE observation_aliases (external_id TEXT PRIMARY KEY, observation_id TEXT NOT NULL REFERENCES observations(observation_id) ON DELETE CASCADE, payload BLOB NOT NULL)")
                 try db.execute("PRAGMA user_version = 3")
+            }
+            if version < 4 {
+                try db.execute("CREATE TABLE potential_baselines (account_id TEXT PRIMARY KEY REFERENCES profiles(account_id), payload BLOB NOT NULL)")
+                try db.execute("PRAGMA user_version = 4")
             }
         }
     }

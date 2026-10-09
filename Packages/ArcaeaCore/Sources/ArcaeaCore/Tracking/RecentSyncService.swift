@@ -9,7 +9,7 @@ public actor RecentSyncService {
         self.client = client; self.archive = archive; self.tracking = tracking; self.deadline = min(20, max(0.01, deadline))
     }
 
-    public func fetch(generation: UUID? = nil, now: Date = Date()) async -> FetchResult {
+    public func fetch(generation: UUID? = nil, now: Date = Date(), finalFetch: Bool = false) async -> FetchResult {
         var lease: FetchLease?
         do {
             try Task.checkCancellation()
@@ -17,7 +17,7 @@ public actor RecentSyncService {
                 return result(.authenticationRequired)
             }
             if session.requiresAttention { return result(.attentionRequired) }
-            let acquired = try tracking.acquire(generation: generation, now: now, deadline: deadline)
+            let acquired = try tracking.acquire(generation: generation, now: now, deadline: deadline, finalFetch: finalFetch)
             lease = acquired
             let start = Date()
             let collected = try await withDeadline { try await self.collect(session: session, configuration: configuration, now: now) }

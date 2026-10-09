@@ -15,6 +15,10 @@ public struct TrackingStatus: Codable, Sendable {
     public var lastNewPlayAt: Date?
     public var lastPlayAt: Date?
     public var nextEligibleAt: Date?
+    // Optional storage supports decoding archives written before this preference existed.
+    fileprivate var savedMinimumIntervalEnabled: Bool? = true
+    fileprivate var protectedCooldownUntil: Date?
+    public var minimumIntervalEnabled: Bool { savedMinimumIntervalEnabled ?? true }
     public var lastStatus: FetchStatus?
     fileprivate var lease: FetchLease?
     fileprivate var consecutiveFailures = 0
@@ -25,6 +29,7 @@ public struct FetchLease: Codable, Sendable {
     public let id: UUID
     public let generation: UUID?
     public let expiresAt: Date
+    public var finalFetch: Bool? = nil
 }
 
 /// A SQLite BEGIN IMMEDIATE lease protects UI and Shortcuts even in different processes.
@@ -47,6 +52,18 @@ public final class TrackingStore: @unchecked Sendable {
         return try read()
     }
 
+    public func setMinimumIntervalEnabled(_ enabled: Bool) throws {
+        try transaction { state in
+            state.savedMinimumIntervalEnabled = enabled
+            updateNextEligible(&state)
+        }
+    }
+
+    private func updateNextEligible(_ state: inout TrackingStatus) {
+        let local = state.minimumIntervalEnabled ? state.lastAttemptAt?.addingTimeInterval(60) : nil
+        state.nextEligibleAt = [local, state.protectedCooldownUntil].compactMap { $0 }.max()
+    }
+
     @discardableResult public func start() throws -> UUID {
         let generation = UUID()
         try transaction { state in state.isActive = true; state.generation = generation }
@@ -55,10 +72,13 @@ public final class TrackingStore: @unchecked Sendable {
 
     public func bind(configuration: RecentConfiguration?) throws {
         try transaction { state in
-            let cooldown = state.nextEligibleAt
+            let cooldown = state.protectedCooldownUntil
+            let enabled = state.minimumIntervalEnabled
             let attempted = state.lastAttemptAt
             state = TrackingStatus()
-            state.nextEligibleAt = cooldown; state.lastAttemptAt = attempted
+            state.protectedCooldownUntil = cooldown; state.lastAttemptAt = attempted
+            state.savedMinimumIntervalEnabled = enabled
+            updateNextEligible(&state)
             state.observer = configuration?.observer; state.target = configuration?.target
         }
     }
@@ -67,13 +87,14 @@ public final class TrackingStore: @unchecked Sendable {
         try transaction { state in state.isActive = false }
     }
 
-    public func acquire(generation: UUID?, now: Date = Date(), deadline: TimeInterval = 20) throws -> FetchLease {
+    public func acquire(generation: UUID?, now: Date = Date(), deadline: TimeInterval = 20, finalFetch: Bool = false) throws -> FetchLease {
         try transaction { state in
-            try validateGeneration(generation, state: state)
+            try validateGeneration(generation, state: state, finalFetch: finalFetch)
             if let lease = state.lease, lease.expiresAt > now { throw TrackingError.alreadyFetching }
             if let next = state.nextEligibleAt, next > now { throw TrackingError.cooldown(until: next) }
-            let lease = FetchLease(id: UUID(), generation: generation, expiresAt: now.addingTimeInterval(min(60, max(1, deadline)) + 5))
-            state.lease = lease; state.lastAttemptAt = now; state.nextEligibleAt = now.addingTimeInterval(60)
+            let lease = FetchLease(id: UUID(), generation: generation, expiresAt: now.addingTimeInterval(min(60, max(1, deadline)) + 5), finalFetch: finalFetch)
+            state.lease = lease; state.lastAttemptAt = now
+            updateNextEligible(&state)
             return lease
         }
     }
@@ -82,11 +103,12 @@ public final class TrackingStore: @unchecked Sendable {
         try transaction { state in
             guard state.lease?.id == lease.id else { return }
             state.lease = nil; state.lastStatus = status
-            if let until = cooldownUntil { state.nextEligibleAt = max(state.nextEligibleAt ?? now, until) }
+            if let until = cooldownUntil { state.protectedCooldownUntil = max(state.protectedCooldownUntil ?? now, until) }
             if [.offline, .failed, .deadlineExceeded].contains(status) {
                 state.consecutiveFailures = min(5, state.consecutiveFailures + 1)
-                state.nextEligibleAt = max(state.nextEligibleAt ?? now, now.addingTimeInterval(min(900, 60 * pow(2, Double(state.consecutiveFailures - 1)))))
+                state.protectedCooldownUntil = max(state.protectedCooldownUntil ?? now, now.addingTimeInterval(min(900, 60 * pow(2, Double(state.consecutiveFailures - 1)))))
             }
+            updateNextEligible(&state)
         }
     }
 
@@ -95,7 +117,7 @@ public final class TrackingStore: @unchecked Sendable {
     @discardableResult public func commit(lease: FetchLease, now: Date = Date(), latestPlay: Date? = nil, operation: () throws -> Int) throws -> Int {
         try transaction { state in
             guard state.lease?.id == lease.id, lease.expiresAt > now else { throw TrackingError.expiredLease }
-            try validateGeneration(lease.generation, state: state)
+            try validateGeneration(lease.generation, state: state, finalFetch: lease.finalFetch == true)
             try Task.checkCancellation()
             let count = try operation()
             state.lease = nil; state.lastSuccessAt = now; state.consecutiveFailures = 0
@@ -106,7 +128,14 @@ public final class TrackingStore: @unchecked Sendable {
         }
     }
 
-    private func validateGeneration(_ generation: UUID?, state: TrackingStatus) throws {
+    private func validateGeneration(_ generation: UUID?, state: TrackingStatus, finalFetch: Bool) throws {
+        // A closing request may commit after stop, but never into a reopened or replaced session.
+        if finalFetch {
+            guard let generation, state.generation == generation, !state.isActive else {
+                throw TrackingError.staleGeneration
+            }
+            return
+        }
         guard let generation else { return }
         guard state.generation == generation else { throw TrackingError.staleGeneration }
         guard state.isActive else { throw TrackingError.trackingStopped }
@@ -137,7 +166,14 @@ public final class TrackingStore: @unchecked Sendable {
         if step == SQLITE_DONE { return TrackingStatus() }
         guard step == SQLITE_ROW, let bytes = sqlite3_column_blob(statement, 0) else { throw TrackingError.database }
         let data = Data(bytes: bytes, count: Int(sqlite3_column_bytes(statement, 0)))
-        return try JSONDecoder().decode(TrackingStatus.self, from: data)
+        var state = try JSONDecoder().decode(TrackingStatus.self, from: data)
+        if state.savedMinimumIntervalEnabled == nil {
+            // Older versions combined local and server delays. Preserve the outstanding
+            // deadline once on upgrade because its origin cannot be recovered reliably.
+            state.savedMinimumIntervalEnabled = true
+            state.protectedCooldownUntil = state.nextEligibleAt
+        }
+        return state
     }
 
     private func execute(_ sql: String) throws {

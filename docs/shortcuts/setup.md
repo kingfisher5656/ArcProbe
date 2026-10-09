@@ -25,7 +25,15 @@ Add Fetch Recent Play with Tracking Generation omitted. Its output is JSON. Use 
 
 `lastPlayAt` is present only when the source supplies a usable play time. Omitted dates remain unknown. `success` means new observations were saved; `unchanged` means no new source event was visible. Repeated payloads deduplicate. A source retaining only its latest play can miss intervening attempts.
 
-`cooldown`, `rateLimited`, and `alreadyFetching` perform no catch-up work. Honor `nextEligibleAt`. `attentionRequired`, `authenticationRequired`, `wrongAccount`, or `unsupportedSchema` require repairing setup in the app; automatic login stops rather than repeating indefinitely. `locked` means unlock the device once. `offline`, `deadlineExceeded`, or `cancelled` preserve saved data. Fetch uses a 20-second total request budget and a persisted minimum 60-second interval; network failures back off, and a server's longer Retry-After wins.
+`cooldown`, `rateLimited`, and `alreadyFetching` perform no catch-up work. Honor `nextEligibleAt`. `attentionRequired`, `authenticationRequired`, `wrongAccount`, or `unsupportedSchema` require repairing setup in the app; automatic login stops rather than repeating indefinitely. `locked` means unlock the device once. `offline`, `deadlineExceeded`, or `cancelled` preserve saved data. Fetch uses a 20-second total request budget and an optional persisted minimum 60-second interval (on by default); network failures back off, and a server's longer Retry-After wins.
+
+## Optional 60-second minimum
+
+In **Accounts & sync → Tracking and Shortcuts**, turn **Enforce 60-second minimum** off to permit earlier recent fetches. This saved preference applies to manual requests and all Shortcut fetches immediately. Server-requested cooldowns, delays after network failures, generation checks, and the single-request lock remain enforced.
+
+Existing Shortcut Wait actions do not change automatically. With the minimum disabled, you may remove the wait before the first closing fetch and use a shorter wait, such as 10–15 seconds, before the second check to allow upload propagation. This is not a guarantee that the score will be visible by then. Keep your normal 60–80-second polling schedule; respect cooldown results and nextEligibleAt. Reopening still cancels a final fetch tied to the old generation.
+
+On the first upgrade from an older version, an already pending cooldown is preserved until its deadline because older versions did not distinguish local and server delays. Subsequent normal minimum-interval waits can be removed immediately by this switch. Turning the switch back on restores the 60-second minimum measured from the last attempt.
 
 ## App Opened automation
 
@@ -33,16 +41,29 @@ Create a personal automation for **Arcaea Is Opened**:
 
 1. Run Set Tracking Active with Active=true. Save its returned UUID string as `This Generation`.
 2. Use a bounded Repeat count (for example 30 iterations).
-3. In each iteration, get Tracking Status and turn its JSON into a dictionary. Stop the Shortcut if `isActive` is false or `generation` differs from `This Generation`.
+3. In each iteration, get Tracking Status and turn its JSON into a dictionary. Stop the Shortcut if `generation` differs from `This Generation`. If `isActive` is false, run the closing catch-up below, then stop.
 4. Run Fetch Recent Play with Tracking Generation=`This Generation`.
 5. If its status requires account attention, stop the loop. If cooldown applies, honor `nextEligibleAt`; do not fetch repeatedly while waiting.
 6. Wait 70 seconds before the next normal iteration. Keep routine `unchanged` results silent. Show a notification only for new plays, completion, failure, or required account action if desired.
 
-The persisted interval prevents earlier calls; server delays can make the interval longer than 70 seconds. Each new open creates a generation, so an old suspended loop cannot commit a play after a newer session starts. Overlapping UI and Shortcut calls use the same durable lease.
+When enabled, the persisted interval prevents earlier calls; server delays can make the interval longer than 70 seconds. Each new open creates a generation, so an old suspended loop cannot commit a play after a newer session starts. Overlapping UI and Shortcut calls use the same durable lease.
 
 ## App Closed automation
 
-For **Arcaea Is Closed**, run Set Tracking Active with Active=false. Optionally perform one final Fetch Recent Play with its generation omitted; it still honors minimum intervals and server cooldown. Do not run a second repeated loop.
+For **Arcaea Is Closed**, run Set Tracking Active with Active=false.
+
+In the existing polling Shortcut, replace the single final fetch in its **tracking is inactive** branch with this bounded catch-up:
+
+1. **Repeat 2 times**.
+2. **Wait 65 seconds**.
+3. **Fetch Recent Play**: Tracking Generation = the original `This Generation` saved when Arcaea opened; **Final Fetch After Closing = On**. Expand the action to find the new option. Leave it Off for normal polling and manual fetches.
+4. Parse the returned JSON. Stop immediately on `staleGeneration`, account-attention statuses, or `locked`. A reopened game or replaced account invalidates the old generation, including a request already in flight.
+5. Both `success` and `unchanged` continue to the second check: a successful first check might still contain only an earlier play. `cooldown`, `alreadyFetching`, and `rateLimited` are **not** successful final fetches. Respect `nextEligibleAt`; if it exceeds the remaining bounded catch-up, stop and report that final sync is pending rather than claiming completion. The ordinary next session or manual fetch can retry.
+6. After the two checks, **Stop This Shortcut**. Do not resume the normal polling loop.
+
+Use this closing branch in only one place. The Closed automation just sets tracking inactive; the existing polling Shortcut performs the catch-up. If that Shortcut is suspended or ended, the branch cannot run.
+
+The original one-shot final fetch could be rejected by the 60-second cooldown, or by `trackingStopped` when it retained its generation. The new option permits a request for that stopped generation without reactivating it or bypassing cooldowns. The two delayed checks also allow time for a newly uploaded play to appear in the recent endpoint. Each app request remains bounded to 20 seconds; waits happen in Shortcuts. This covers normal upload delay, not arbitrary server delays or iOS terminating the automation.
 
 ## Required device check
 

@@ -57,6 +57,7 @@ struct PublicResourceLoader: Sendable {
     private let memory = NSCache<NSString, UIImage>()
     private(set) var revision = 0
     private(set) var downloading = false
+    private(set) var managingCoverBackup = false
     private(set) var refreshingConstants = false
     private(set) var progress = ""
     private(set) var constantsDate: Date? = UserDefaults.standard.object(forKey: "constantsFetchedAt") as? Date
@@ -117,7 +118,7 @@ struct PublicResourceLoader: Sendable {
         } catch { saveCooldown(error, key: "constantsCooldown"); throw error }
     }
     func downloadCovers(charts: [ChartMetadata], refresh: Bool = false) {
-        guard !downloading else { return }
+        guard !downloading, !managingCoverBackup else { return }
         downloading = true; message = nil
         let identifiers = Set(charts.compactMap(\.artworkIdentifier)).sorted()
         downloadTask = Task {
@@ -147,6 +148,37 @@ struct PublicResourceLoader: Sendable {
             } catch is CancellationError { message = "Cover download cancelled. Completed covers are retained." }
             catch { saveCooldown(error, key: "coverCooldown"); message = error.localizedDescription }
         }
+    }
+    func exportCoverBackup() async throws -> URL {
+        guard !managingCoverBackup, !downloading else { throw LibraryResourceError.unavailable }
+        managingCoverBackup = true
+        defer { managingCoverBackup = false }
+        let folder = try ArchiveLocation.directory().appendingPathComponent("covers", isDirectory: true)
+        return try await Task.detached(priority: .userInitiated) {
+            let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("ArcProbe-cover-export-" + UUID().uuidString, isDirectory: true)
+            try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
+            do {
+                let output = temporary.appendingPathComponent("ArcProbe-covers.arcprobe-covers")
+                _ = try CoverBackup.export(from: folder, to: output)
+                return output
+            } catch {
+                try? FileManager.default.removeItem(at: temporary)
+                throw error
+            }
+        }.value
+    }
+    func restoreCoverBackup(from input: URL) async throws {
+        guard !managingCoverBackup, !downloading else { throw LibraryResourceError.unavailable }
+        managingCoverBackup = true
+        // Invalidate even on a disk error after a partially completed merge.
+        defer { managingCoverBackup = false; memory.removeAllObjects(); revision += 1 }
+        let folder = try ArchiveLocation.directory().appendingPathComponent("covers", isDirectory: true)
+        let result = try await Task.detached(priority: .userInitiated) {
+            let accessed = input.startAccessingSecurityScopedResource()
+            defer { if accessed { input.stopAccessingSecurityScopedResource() } }
+            return try CoverBackup.restore(from: input, into: folder)
+        }.value
+        message = "Restored \(result.imported) covers; kept \(result.retained) existing covers of equal or higher resolution."
     }
     func cancelDownload() { downloadTask?.cancel() }
     static func thumbnail(_ data: Data) throws -> Data {

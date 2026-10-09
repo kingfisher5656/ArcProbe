@@ -29,6 +29,45 @@ import XCTest
         XCTAssertEqual(paths, ["/webapi/user/me", "/webapi/user/me"])
     }
 
+    func testClosingCatchUpWaitsForCooldownThenImportsDelayedLastPlay() async throws {
+        let delayed = accountJSON.replacingOccurrences(of: "9800000", with: "9900000")
+            .replacingOccurrences(of: "1700000000123", with: "1700000040123")
+        let (service, _, archive, tracking, _) = try await makeService([
+            jsonResponse(accountJSON), jsonResponse(accountJSON), jsonResponse(delayed)
+        ])
+        let now = Date(timeIntervalSince1970: 1_700_000_010)
+        let generation = try tracking.start()
+        _ = await service.fetch(generation: generation, now: now)
+        try tracking.stop()
+        let early = await service.fetch(generation: generation, now: now.addingTimeInterval(10), finalFetch: true)
+        XCTAssertEqual(early.status, .cooldown)
+        let first = await service.fetch(generation: generation, now: now.addingTimeInterval(65), finalFetch: true)
+        XCTAssertEqual(first.status, .unchanged)
+        let last = await service.fetch(generation: generation, now: now.addingTimeInterval(130), finalFetch: true)
+        XCTAssertEqual(last.status, .success)
+        XCTAssertEqual(try archive.sourceObservations(accountID: AccountID("online:7")).count, 2)
+        XCTAssertFalse(try tracking.status().isActive)
+    }
+
+    func testFinalFetchPreservesServerBackoffAndRejectsActiveOrMissingGeneration() async throws {
+        let (service, _, _, tracking, _) = try await makeService([jsonResponse("{}", status: 429, headers: ["Retry-After": "180"])])
+        let now = Date(timeIntervalSince1970: 1_700_000_010)
+        let generation = try tracking.start()
+        let active = await service.fetch(generation: generation, now: now, finalFetch: true)
+        XCTAssertEqual(active.status, .staleGeneration)
+        try tracking.stop()
+        let missing = await service.fetch(now: now, finalFetch: true)
+        XCTAssertEqual(missing.status, .staleGeneration)
+        let limited = await service.fetch(generation: generation, now: now, finalFetch: true)
+        XCTAssertEqual(limited.status, .rateLimited)
+        let retry = await service.fetch(generation: generation, now: now.addingTimeInterval(65), finalFetch: true)
+        XCTAssertEqual(retry.status, .cooldown)
+        XCTAssertEqual(retry.nextEligibleAt, now.addingTimeInterval(180))
+        _ = try tracking.start()
+        let stale = await service.fetch(generation: generation, now: now.addingTimeInterval(200), finalFetch: true)
+        XCTAssertEqual(stale.status, .staleGeneration)
+    }
+
     func testExpiredSessionRefreshesOnceAndRetryNeverRefreshesAgain() async throws {
         let (service, transport, archive, _, _) = try await makeService([
             jsonResponse("{}", status: 401), jsonResponse(#"{"value":{}}"#), jsonResponse(accountJSON), jsonResponse("{}", status: 401)
@@ -87,6 +126,22 @@ actor CancellableTransport: HTTPTransport {
         XCTAssertEqual(result.status, .trackingStopped)
         XCTAssertTrue(try archive.sourceObservations(accountID: AccountID("online:7")).isEmpty)
     }
+    func testReopenDuringFinalFetchRejectsOldCommit() async throws {
+        let transport = SuspendedTransport()
+        let (service, _, archive, tracking) = try await make(transport: transport)
+        let generation = try tracking.start()
+        try tracking.stop()
+        let task = Task { await service.fetch(generation: generation, finalFetch: true) }
+        await transport.waitForRequest()
+        let replacement = try tracking.start()
+        await transport.resume(jsonResponse(#"{"value":{"user_id":7,"recent_score":[{"song_id":"test","difficulty":2,"score":9900000}]}}"#))
+        let result = await task.value
+        XCTAssertEqual(result.status, .staleGeneration)
+        XCTAssertTrue(try archive.sourceObservations(accountID: AccountID("online:7")).isEmpty)
+        XCTAssertEqual(try tracking.status().generation, replacement)
+        XCTAssertTrue(try tracking.status().isActive)
+    }
+
     func testOldChallengeCannotLatchReplacementRole() async throws {
         let transport = SuspendedTransport()
         let (service, sessions, _, _) = try await make(transport: transport)

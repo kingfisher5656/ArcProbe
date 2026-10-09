@@ -42,6 +42,16 @@ struct AccountSettingsSections: View {
             if runtime.recentProfile != nil { Button("Disconnect recent login", role: .destructive) { disconnecting = .burner } }
         } header: { Text("Recent account · separate session") } footer: { Text(mode == .ownAccountTesting ? "Testing mode reads recent plays from the independently signed-in observer. You may temporarily use your main account identity here; its recent session stays separate from full import." : "Friend mode observes the connected main account through the burner’s friends list. Connect your main login first. The burner must already be friends with it.") }
         Section("Tracking and Shortcuts") {
+            Toggle("Enforce 60-second minimum", isOn: Binding(
+                get: { runtime.trackingStatus?.minimumIntervalEnabled ?? true },
+                set: { enabled in
+                    do { try runtime.setMinimumIntervalEnabled(enabled) }
+                    catch { model.errorMessage = error.localizedDescription }
+                }
+            ))
+            .accessibilityIdentifier("minimumFetchInterval")
+            Text("Applies to manual and Shortcut recent fetches. Turn off to allow earlier requests. Server cooldowns, delays after network failures, and protection against simultaneous requests still apply. Existing Shortcut Wait actions are unchanged.")
+                .font(.footnote).foregroundStyle(.secondary)
             TrackingStatusCard()
             Button(runtime.trackingStatus?.isActive == true ? "Set tracking inactive" : "Set tracking active", systemImage: runtime.trackingStatus?.isActive == true ? "stop.circle" : "play.circle") {
                 do { if runtime.trackingStatus?.isActive == true { try runtime.stopTracking() } else { _ = try runtime.startTracking() } } catch { model.errorMessage = error.localizedDescription }
@@ -133,8 +143,8 @@ struct ShortcutInstructionsView: View {
         List {
             Section("One-shot fetch") { Text("Set up the recent account in Settings, then add Fetch Recent Play to a Shortcut. It reuses the recent session and reports status, added count, and the next eligible request time.") }
             Section("Arcaea opened") { Text("Create an Arcaea App Opened automation. Run Set Tracking Active with Active enabled, keep its generation result, then use Fetch Recent Play with that generation. A bounded Repeat / Wait experiment can target 70 seconds between requests.") }
-            Section("Arcaea closed") { Text("Create an Arcaea App Closed automation that disables Set Tracking Active. Every loop iteration must keep its original generation so old loops cannot resume after a new play session begins.") }
-            Section("Timing") { Text("Respect the saved next eligible time and server cooldowns. The minimum request interval is 60 seconds. iPadOS can suspend a Shortcut loop; sustained 60–80-second capture remains experimental until a 30–60-minute device test verifies it.") }
+            Section("Arcaea closed") { Text("Create an Arcaea App Closed automation that disables Set Tracking Active. In the polling Shortcut’s inactive branch, Repeat 2 times: Wait 65 seconds, then Fetch Recent Play with Final Fetch After Closing enabled and the original generation. Then stop the Shortcut. Keep this option off for normal polling. A new generation cancels old closing fetches. Respect nextEligibleAt if the server requires a longer wait; cooldown is not a completed sync.") }
+            Section("Timing") { Text("Respect the saved next eligible time and server cooldowns. The optional 60-second minimum can be disabled in Tracking and Shortcuts. iPadOS can suspend a Shortcut loop; sustained 60–80-second capture remains experimental until a 30–60-minute device test verifies it.") }
             Section("Credentials") { Text("Configure Recent Account accepts credentials once. Remove literal passwords from saved setup actions after configuration; recurring Fetch Recent Play has no password parameter.") }
         }.navigationTitle("Shortcut setup")
     }

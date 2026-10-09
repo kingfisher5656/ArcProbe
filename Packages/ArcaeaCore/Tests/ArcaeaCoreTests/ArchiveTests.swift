@@ -10,6 +10,7 @@ final class ArchiveTests: XCTestCase {
             _ = try store.apply(batch: ImportBatch(profile: AccountProfile(id: testAccount), observations: [original]))
             try store.database.execute("DROP TABLE observation_captures")
             try store.database.execute("DROP TABLE IF EXISTS observation_aliases")
+            try store.database.execute("DROP TABLE potential_baselines")
             try store.database.execute("PRAGMA user_version = 1")
         }
         let migrated = try ArchiveStore(url: url)

@@ -60,13 +60,14 @@ func shortcutJSON<T: Encodable>(_ value: T) throws -> String {
 }
 
 @MainActor enum ShortcutActions {
-    static func fetch(runtime: OnlineRuntime, generation: String?) async throws -> String {
+    static func fetch(runtime: OnlineRuntime, generation: String?, finalFetch: Bool = false) async throws -> String {
         let parsed: UUID?
         if let generation, !generation.isEmpty {
             guard let id = UUID(uuidString: generation) else { throw ShortcutActionError.invalidGeneration }
             parsed = id
         } else { parsed = nil }
-        let result = await runtime.fetchRecent(generation: parsed)
+        if finalFetch && parsed == nil { throw ShortcutActionError.invalidGeneration }
+        let result = await runtime.fetchRecent(generation: parsed, finalFetch: finalFetch)
         return try shortcutJSON(ShortcutFetchOutput(result))
     }
     static func setTracking(runtime: OnlineRuntime, active: Bool) throws -> String {

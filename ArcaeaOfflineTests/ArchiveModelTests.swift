@@ -65,6 +65,26 @@ final class ArchiveModelTests: XCTestCase {
         XCTAssertEqual(model.observations.first?.original.source, .officialImport)
         XCTAssertEqual(model.recentObservations.count, 1)
     }
+    func testGraphContinuationRebuildsFromSyncBaselineAndRestores() throws {
+        let model = try makeModel()
+        let account = AccountID("local")
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let baseline = ScoreObservation(id: ObservationID("baseline"), accountID: account, chartID: chart, source: .officialImport,
+            values: ScoreValues(score: 9_800_000), firstSeenAt: date)
+        let anchor = PotentialPoint(accountID: account, sourceID: "anchor", timestamp: SourceTimestamp(value: 1_700_000_000, unit: .seconds), value: PotentialValue(rawValue: 12000, decimalPlaces: 3), firstSeenAt: date)
+        _ = try model.store.apply(batch: ImportBatch(profile: AccountProfile(id: account), observations: [baseline], potentialPoints: [anchor], importedAt: date, kind: .full))
+        try model.reload()
+        XCTAssertTrue(model.localHistory.isEmpty)
+        try model.save(ScoreDraft(chartID: chart, score: 10_000_000, playedAt: date.addingTimeInterval(100)))
+        XCTAssertEqual(model.localHistory.last?.value.rawValue, 12_033_333)
+        XCTAssertEqual(model.officialHistory, [anchor])
+        let history = model.localHistory
+        let restored = try makeModel()
+        try restored.restoreBackup(ArchiveBackup(store: model.store).export())
+        XCTAssertEqual(restored.localHistory, history)
+        XCTAssertEqual(restored.potentialSyncDate, date)
+    }
+
     func testInvalidScoreLeavesArchiveUnchanged() throws {
         let model = try makeModel()
         XCTAssertThrowsError(try model.save(ScoreDraft(chartID: chart, score: -1))) { error in

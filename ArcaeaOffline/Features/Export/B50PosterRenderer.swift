@@ -1,5 +1,6 @@
 import ArcaeaCore
 import UIKit
+import CoreText
 
 /// Fixed print layout, measured against the supplied 1800 × 3208 reference.
 /// Decorations are drawn locally; the reference image and its player data are never bundled.
@@ -86,12 +87,12 @@ import UIKit
         }
         // The badge's transparent PNG includes the appropriate ring and star count.
         let rank = potentialRank(potential).map(String.init) ?? "off"
-        UIImage(named: "PotentialRank" + rank)?.draw(in: CGRect(x: 1120, y: 249, width: 90, height: 90))
+        UIImage(named: "PotentialRank" + rank)?.draw(in: CGRect(x: 1126, y: 230, width: 90, height: 90))
         let potentialText = PosterTypography.potential(potential)
         let textSize = potentialText.size()
-        let origin = CGPoint(x: 1165 - textSize.width / 2, y: 292 - textSize.height / 2)
+        let origin = CGPoint(x: 1171 - textSize.width / 2, y: 273 - textSize.height / 2)
         let stroke = NSMutableAttributedString(attributedString: potentialText)
-        stroke.addAttributes([.strokeColor: ink, .strokeWidth: 7], range: NSRange(location: 0, length: stroke.length))
+        stroke.addAttributes([.strokeColor: UIColor.black, .strokeWidth: 12], range: NSRange(location: 0, length: stroke.length))
         stroke.draw(at: origin); potentialText.draw(at: origin)
 
     }
@@ -112,10 +113,12 @@ import UIKit
     private static func card(_ card: Card?, cg: CGContext) {
         let body = CGRect(x: 0, y: 0, width: 284, height: 226)
         let difficulty = card?.row.best.chartID.difficulty ?? .future
-        let accent = difficultyColor(difficulty)
+        let accent = difficultyColor(difficulty, label: card?.metadata?.difficultyLabel)
+        let topTen = (card?.row.rank ?? 51) <= 10
+        let frame = color(topTen ? 0x929dd0 : 0xb68dcd)
         cg.saveGState(); cg.setShadow(offset: .zero, blur: 20, color: accent.withAlphaComponent(0.3).cgColor)
-        lavender.setFill(); cg.fill(body.insetBy(dx: -2, dy: -2)); cg.restoreGState()
-        gradient(body, [color(0x314358), color(0x29283e), color(0x70557e)], cg)
+        frame.setFill(); cg.fill(body.insetBy(dx: -2, dy: -2)); cg.restoreGState()
+        gradient(body, topTen ? [color(0x354b68), color(0x29354d), color(0x657ba4)] : [color(0x483950), color(0x30283e), color(0x795786)], cg)
         cg.saveGState(); cg.clip(to: body)
         for i in -2..<9 {
             let x = CGFloat(i) * 49
@@ -123,7 +126,7 @@ import UIKit
             rule(CGPoint(x: x, y: 226), CGPoint(x: x + 230, y: 0), lavender.withAlphaComponent(0.1), cg)
         }
         cg.restoreGState()
-        gradient(CGRect(x: 0, y: 0, width: 284, height: 6), [accent.withAlphaComponent(0.8), color(0x2c2c43)], cg)
+        gradient(CGRect(x: 0, y: 0, width: 284, height: 6), [frame.withAlphaComponent(0.8), color(0x2c2c43)], cg)
         guard let card else {
             label("—", CGRect(x: 0, y: 70, width: 284, height: 70), 44, .white.withAlphaComponent(0.4), align: .center)
             label("No saved score", CGRect(x: 10, y: 194, width: 264, height: 26), 20, .white.withAlphaComponent(0.6), align: .center)
@@ -152,8 +155,8 @@ import UIKit
         label(card.row.ratingUnits.map { RatingCalculator.display($0) } ?? "—", CGRect(x: 4, y: 85, width: 84, height: 33), 22, ratingColor, weight: .medium, align: .center, minimum: 18)
         rule(CGPoint(x: 20, y: 121), CGPoint(x: 72, y: 121), lavender.withAlphaComponent(0.5), cg)
         diamond(center: CGPoint(x: 46, y: 151), radius: 26, colors: [color(0xf0e2ee), color(0x9ebfdf), color(0xa98ab9)], cg: cg)
-        label(DisplayFormat.grade(card.row.best.values.score), CGRect(x: 13, y: 133, width: 66, height: 43), 29, color(0x614870), weight: .light, align: .center, minimum: 24)
-        gradient(CGRect(x: 0, y: 194, width: 284, height: 32), [lavender.withAlphaComponent(0.9), color(0x8a779d)], cg)
+        badgeText(DisplayFormat.grade(card.row.best.values.score), center: CGPoint(x: 46, y: 151), radius: 26, size: 29, color: color(0x614870), weight: .light, cg: cg)
+        gradient(CGRect(x: 0, y: 194, width: 284, height: 32), [frame.withAlphaComponent(0.9), color(topTen ? 0x667a9d : 0x8a679d)], cg)
         label(card.title, CGRect(x: 12, y: 194, width: 260, height: 31), 24, .white, weight: .semibold, outline: true, minimum: 18, family: .titillium)
         diamond(center: CGPoint(x: 276, y: 8), radius: 33, colors: [accent, accent.withAlphaComponent(0.8), ink], cg: cg)
         label(card.metadata?.level ?? "?", CGRect(x: 246, y: -9, width: 60, height: 36), 25, .white, weight: .medium, align: .center, minimum: 20)
@@ -168,16 +171,42 @@ import UIKit
         case nil: color(0x706579)
         }
         diamond(center: CGPoint(x: 274, y: 187), radius: 31, colors: [clearColor, color(0x17182c)], cg: cg)
-        label(clearSymbol(clear), CGRect(x: 248, y: 161, width: 52, height: 57), 44, .white, weight: .ultraLight, align: .center, outline: true)
+        badgeText(clearSymbol(clear), center: CGPoint(x: 274, y: 187), radius: 31, size: 44, color: .white, weight: .ultraLight, outline: true, cg: cg)
     }
-    private static func difficultyColor(_ difficulty: Difficulty) -> UIColor {
-        switch difficulty {
+    private static func difficultyColor(_ difficulty: Difficulty, label: String?) -> UIColor {
+        if label?.uppercased() == "INS" { return color(0x283d8c) }
+        return switch difficulty {
         case .past: color(0x328cae)
         case .present: color(0x57955a)
-        case .future: color(0x79436f)
-        case .beyond: color(0xa6193c)
-        case .eternal: color(0x33397d)
+        case .future: color(0x803c70)
+        case .beyond: color(0xb71939)
+        case .eternal: color(0x66508e)
         }
+    }
+    /// Center visible glyph bounds, not font line spacing. The fitted bounding box stays
+    /// inside the diamond's sloping edges, including the optional outline.
+    private static func badgeText(_ text: String, center: CGPoint, radius: CGFloat, size: CGFloat, color: UIColor, weight: UIFont.Weight, outline: Bool = false, cg: CGContext) {
+        let font = PosterTypography.font(.exo2, size: size, weight: weight)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attributes))
+        let bounds = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        let padding: CGFloat = outline ? 4 : 3
+        let scale = min(1, 2 * (radius - padding) / (bounds.width + bounds.height))
+        cg.saveGState()
+        cg.translateBy(x: center.x, y: center.y)
+        cg.scaleBy(x: scale, y: -scale)
+        cg.textMatrix = .identity
+        let origin = CGPoint(x: -bounds.midX, y: -bounds.midY)
+        if outline {
+            var stroke = attributes
+            stroke[.strokeColor] = ink; stroke[.strokeWidth] = 7
+            cg.textPosition = origin
+            CTLineDraw(CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: stroke)), cg)
+        }
+        cg.textPosition = origin
+        CTLineDraw(line, cg)
+        cg.restoreGState()
     }
     private static func color(_ hex: UInt32, alpha: CGFloat = 1) -> UIColor {
         UIColor(red: CGFloat((hex >> 16) & 255) / 255, green: CGFloat((hex >> 8) & 255) / 255, blue: CGFloat(hex & 255) / 255, alpha: alpha)

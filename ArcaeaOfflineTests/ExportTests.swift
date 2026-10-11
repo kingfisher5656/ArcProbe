@@ -111,9 +111,9 @@ import UIKit
     }
     private func makeModel(count: Int, partnerIcon: String? = nil) throws -> ArchiveModel {
         let profile = AccountProfile(id: AccountID("export-test"), displayName: "Synthetic player", partnerIcon: partnerIcon)
-        let charts = (0..<count).map { ChartMetadata(id: ChartID(songID: String(format: "chart%02d", $0), difficulty: Difficulty(rawValue: $0 == 0 ? 3 : $0 % 5)!), constant: ChartConstant(tenths: 100), level: $0 % 3 == 0 ? "11+" : "11", title: $0 == 0 ? "Title, \"quoted\"" : "Chart \($0)", artworkIdentifier: "official-test", provenance: "synthetic") }
+        let charts = (0..<count).map { ChartMetadata(id: ChartID(songID: String(format: "chart%02d", $0), difficulty: Difficulty(rawValue: $0 == 0 ? 3 : $0 % 5)!), constant: ChartConstant(tenths: 100), level: $0 % 3 == 0 ? "11+" : "11", difficultyLabel: $0 % 10 == 3 ? "INS" : nil, title: $0 == 0 ? "Title, \"quoted\"" : "Chart \($0)", artworkIdentifier: "official-test", provenance: "synthetic") }
         let store = try ArchiveStore(url: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("archive.sqlite"), catalog: ChartCatalog(charts: charts))
-        let scores = charts.enumerated().map { ScoreObservation(id: ObservationID("export:\($0.offset)"), accountID: profile.id, chartID: $0.element.id, source: .manual, values: ScoreValues(score: 9_900_000 - $0.offset), firstSeenAt: Date(), identityConfidence: .manual) }
+        let scores = charts.enumerated().map { ScoreObservation(id: ObservationID("export:\($0.offset)"), accountID: profile.id, chartID: $0.element.id, source: .manual, values: ScoreValues(score: 9_950_000 - $0.offset * 10_000, bestClear: [ClearType.hard, .normal, .easy, .fullRecall, .pureMemory, .trackLost][$0.offset % 6]), firstSeenAt: Date(), identityConfidence: .manual) }
         _ = try store.apply(batch: ImportBatch(profile: profile, observations: scores, charts: charts))
         return try ArchiveModel(store: store, catalog: ChartCatalog(charts: charts))
     }

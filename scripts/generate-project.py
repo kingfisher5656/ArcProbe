@@ -16,6 +16,7 @@ for folder in ['ArcaeaOffline', 'ArcaeaOfflineTests', 'ArcaeaOfflineUITests']:
         rel = str(file.relative_to(root))
         files[rel] = obj('file:'+rel, f'isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = {q(rel)}; sourceTree = SOURCE_ROOT;')
 assets = obj('assets', 'isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = ArcaeaOffline/Resources/Assets.xcassets; sourceTree = SOURCE_ROOT;')
+fonts = obj('fonts', 'isa = PBXFileReference; lastKnownFileType = folder; path = ArcaeaOffline/Resources/Fonts; sourceTree = SOURCE_ROOT;')
 products=[]; target_ids=[]; config_ids={}
 for target, ext in [('ArcaeaOffline','app'),('ArcaeaOfflineTests','xctest'),('ArcaeaOfflineUITests','xctest')]:
     product=obj('product:'+target, f'isa = PBXFileReference; explicitFileType = {"wrapper.application" if ext == "app" else "wrapper.cfbundle"}; includeInIndex = 0; path = {q(target+"."+ext)}; sourceTree = BUILT_PRODUCTS_DIR;'); products.append(product)
@@ -24,7 +25,7 @@ for target, ext in [('ArcaeaOffline','app'),('ArcaeaOfflineTests','xctest'),('Ar
         if path.split('/')[0] == target: sourcebuild.append(obj('build:'+path, f'isa = PBXBuildFile; fileRef = {file};'))
     sources=obj('sources:'+target, f'isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ({",".join(sourcebuild)}); runOnlyForDeploymentPostprocessing = 0;')
     resources=[]
-    if target == 'ArcaeaOffline': resources=[obj('assetbuild',f'isa = PBXBuildFile; fileRef = {assets};')]
+    if target == 'ArcaeaOffline': resources=[obj('assetbuild',f'isa = PBXBuildFile; fileRef = {assets};'), obj('fontbuild', f'isa = PBXBuildFile; fileRef = {fonts};')]
     resourcephase=obj('resources:'+target, f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({",".join(resources)}); runOnlyForDeploymentPostprocessing = 0;')
     frameworks=[]; deps=[]
     if target != 'ArcaeaOfflineUITests':
@@ -34,7 +35,7 @@ for target, ext in [('ArcaeaOffline','app'),('ArcaeaOfflineTests','xctest'),('Ar
     fw=obj('frameworks:'+target,f'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = ({",".join(frameworks)}); runOnlyForDeploymentPostprocessing = 0;')
     configs=[]
     for configuration in ['Debug','Release']:
-        settings={'PRODUCT_NAME':'$(TARGET_NAME)','PRODUCT_BUNDLE_IDENTIFIER':'app.arcaeaoffline'+('.tests' if target.endswith('Tests') and not target.endswith('UITests') else '.uitests' if target.endswith('UITests') else ''),'IPHONEOS_DEPLOYMENT_TARGET':'18.0','TARGETED_DEVICE_FAMILY':'1,2','GENERATE_INFOPLIST_FILE':'YES','SWIFT_VERSION':'6.0','CODE_SIGN_STYLE':'Automatic','CURRENT_PROJECT_VERSION':'9','MARKETING_VERSION':'0.2.7','SDKROOT':'iphoneos','SUPPORTED_PLATFORMS':'iphoneos iphonesimulator','SWIFT_STRICT_CONCURRENCY':'complete'}
+        settings={'PRODUCT_NAME':'$(TARGET_NAME)','PRODUCT_BUNDLE_IDENTIFIER':'app.arcaeaoffline'+('.tests' if target.endswith('Tests') and not target.endswith('UITests') else '.uitests' if target.endswith('UITests') else ''),'IPHONEOS_DEPLOYMENT_TARGET':'18.0','TARGETED_DEVICE_FAMILY':'1,2','GENERATE_INFOPLIST_FILE':'YES','SWIFT_VERSION':'6.0','CODE_SIGN_STYLE':'Automatic','CURRENT_PROJECT_VERSION':'12','MARKETING_VERSION':'0.2.10','SDKROOT':'iphoneos','SUPPORTED_PLATFORMS':'iphoneos iphonesimulator','SWIFT_STRICT_CONCURRENCY':'complete'}
         if target == 'ArcaeaOffline':
             settings.update({'INFOPLIST_KEY_CFBundleDisplayName':'ArcProbe','INFOPLIST_KEY_UILaunchScreen_Generation':'YES','INFOPLIST_KEY_UIApplicationSceneManifest_Generation':'YES','INFOPLIST_KEY_UISupportedInterfaceOrientations':'UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight','INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad':'UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight','ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME':'AccentColor','ASSETCATALOG_COMPILER_APPICON_NAME':'AppIcon','ENABLE_PREVIEWS':'YES'})
         elif target == 'ArcaeaOfflineTests':
@@ -49,7 +50,7 @@ for target, ext in [('ArcaeaOffline','app'),('ArcaeaOfflineTests','xctest'),('Ar
         dependencies.append(obj('targetdependency:'+target,f'isa = PBXTargetDependency; target = {uid("target:ArcaeaOffline")}; targetProxy = {proxy};'))
     tid=obj('target:'+target,f'isa = PBXNativeTarget; buildConfigurationList = {configlist}; buildPhases = ({sources},{fw},{resourcephase}); buildRules = (); dependencies = ({",".join(dependencies)}); name = {target}; packageProductDependencies = ({",".join(deps)}); productName = {target}; productReference = {product}; productType = {q("com.apple.product-type.application" if ext=="app" else "com.apple.product-type.bundle.ui-testing" if target.endswith("UITests") else "com.apple.product-type.bundle.unit-test")};'); target_ids.append(tid)
 productgroup=obj('products',f'isa = PBXGroup; children = ({",".join(products)}); name = Products; sourceTree = "<group>";')
-main=obj('main',f'isa = PBXGroup; children = ({",".join(files.values())},{assets},{productgroup}); sourceTree = "<group>";')
+main=obj('main',f'isa = PBXGroup; children = ({",".join(files.values())},{assets},{fonts},{productgroup}); sourceTree = "<group>";')
 projectconfigs=[]
 for c in ['Debug','Release']:
     projectconfigs.append(obj('projconfig:'+c,f'isa = XCBuildConfiguration; buildSettings = {{ CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; GCC_C_LANGUAGE_STANDARD = gnu17; }}; name = {c};'))

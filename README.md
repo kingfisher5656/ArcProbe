@@ -16,7 +16,7 @@ Official history and local estimates stay separate. Constants are a dated snapsh
 
 ## Install and configure
 
-The generated `artifacts/ArcProbe-0.2.7.ipa` is an unsigned iPhoneOS arm64 package. Import it into SideStore for signing and installation. It is not a pre-signed IPA. Direct installation is the intended path for Shortcuts; LiveContainer background-action discovery has not been verified.
+The generated `artifacts/ArcProbe-0.2.10.ipa` is an unsigned iPhoneOS arm64 package. Import it into SideStore for signing and installation. It is not a pre-signed IPA. Direct installation is the intended path for Shortcuts; LiveContainer background-action discovery has not been verified.
 
 1. Open **Accounts & sync** and sign into the main account using the official login page. Confirm **Use signed-in account**, then run the full import. This account needs an active Arcaea Online subscription.
 2. Set up the **Recent account** independently. For now choose **Own account (testing)** and sign in with the same main account identity. The two sessions remain isolated.
@@ -55,6 +55,16 @@ xcodebuild test -project ArcaeaOffline.xcodeproj -scheme ArcaeaOffline \
 zsh scripts/package-ipa.sh
 ```
 
-Use an installed iOS 18+ simulator and a current Xcode supporting the deployment target. Packaging writes its build log under `build/package` and IPA/checksum under `artifacts`. See [release verification](docs/verification/arcprobe-0.2.7.md) for actual checks and untested device requirements. The website adapter is based on inspected official frontend contracts and synthetic regression fixtures; real authenticated app import is a separate acceptance test.
+Use an installed iOS 18+ simulator and a current Xcode supporting the deployment target. Packaging writes its build log under `build/package` and IPA/checksum under `artifacts`. See [release verification](docs/verification/arcprobe-0.2.10.md) for actual checks and untested device requirements. The website adapter is based on inspected official frontend contracts and synthetic regression fixtures; real authenticated app import is a separate acceptance test.
 
 See [notices](NOTICE.md) for metadata attribution. The sibling ArcPotApk project is a read-only reference and is not a build dependency.
+
+## Best 50 image export
+
+Share B50 JPG uses a 1800 × 3208 portrait with a five-column, ten-row grid, a pale lavender background, player/potential banner, large cached song covers, gold top-ten ratings, score overlays, and difficulty/clear diamonds. Its layout follows the supplied Arcaea Online reference while retaining ArcProbe branding and identifying potential as an estimate. It does not bundle the reference image, the reference account information.
+
+Export uses downloaded artwork (difficulty-specific wiki artwork first, then the official cover). Download or restore covers in Settings before exporting; missing art uses a placeholder and export does not log in or download song covers. Unknown levels, ratings, and clear statuses stay unknown. The clear badge shows the saved chart-best clear; CSV retains full source/date details.
+
+The header diamond shows the selected account’s last observed equipped partner, updated through recent friend fetches or main-account imports. Export downloads the small portrait from the official public asset server once and caches it for offline use. If no partner is known, fetch recent once; failed or unavailable portraits use a neutral placeholder. The portrait identifier is included in JSON backups; its separate image cache can be downloaded again after reinstalling. The potential badge overlaps the portrait’s lower-right edge and uses the official rank backgrounds (one star at 12.000, two at 12.500, three at 13.000). The estimate note appears only in the footer.
+
+JPG typography uses bundled SIL Open Font License families: Exo for header potential, Exo 2 for numeric/card text and the player name, Titillium Web for titles and small labels, and Open Sans for the generated date. Fractional header potential digits use 16/22 of the whole-number font size on a shared baseline. These are close open-source matches, not a claim that the server-generated official JPG uses identical settings. Font licenses ship in the app’s Fonts folder; see [font sources](docs/export-fonts.md).

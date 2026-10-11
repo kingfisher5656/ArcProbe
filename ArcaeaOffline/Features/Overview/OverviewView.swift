@@ -4,6 +4,7 @@ import SwiftUI
 struct OverviewView: View {
     @Environment(ArchiveModel.self) private var model
     @State private var export: ShareFile?
+    @State private var exportingJPG = false
     private let columns = [GridItem(.adaptive(minimum: 240), spacing: 14)]
     var body: some View {
         ScrollView {
@@ -27,7 +28,14 @@ struct OverviewView: View {
         .toolbar {
             if !(model.ranking?.rows.isEmpty ?? true) {
                 Menu {
-                    Button("Share B50 JPG", systemImage: "photo") { model.perform { export = try ScoreExportService.jpg(model: model) } }
+                    Button(exportingJPG ? "Preparing B50 JPG…" : "Share B50 JPG", systemImage: "photo") {
+                        exportingJPG = true
+                        Task { @MainActor in
+                            defer { exportingJPG = false }
+                            do { export = try await ScoreExportService.jpg(model: model) }
+                            catch { model.errorMessage = error.localizedDescription }
+                        }
+                    }.disabled(exportingJPG)
                     Button("Share B50 CSV", systemImage: "tablecells") { model.perform { export = try ScoreExportService.csv(model: model) } }
                 } label: { Image(systemName: "square.and.arrow.up") }
                 .accessibilityLabel("Export Best 50")

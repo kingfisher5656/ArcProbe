@@ -24,6 +24,9 @@ internal enum ArchiveValidation {
     }
     static func profile(_ profile: AccountProfile) throws {
         try account(profile.id)
+        if let icon = profile.partnerIcon, !AccountProfile.validPartnerIcon(icon) {
+            throw ArchiveError.invalidRecord("Invalid partner icon")
+        }
         if let name = profile.displayName, name.utf8.count > 1_000 || name.contains("\0") {
             throw ArchiveError.invalidRecord("Invalid display name")
         }

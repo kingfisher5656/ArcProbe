@@ -32,8 +32,11 @@ public final class ArchiveStore: @unchecked Sendable {
                 throw ArchiveError.invalidRecord("Import collection is too large")
             }
             return try database.transaction {
+                let previous: AccountProfile? = try record("SELECT payload FROM profiles WHERE account_id=?", [.text(batch.profile.id.rawValue)])
+                let profile = AccountProfile(id: batch.profile.id, displayName: batch.profile.displayName ?? previous?.displayName,
+                    partnerIcon: batch.profile.partnerIcon ?? previous?.partnerIcon)
                 try database.execute("INSERT INTO profiles(account_id, payload) VALUES(?, ?) ON CONFLICT(account_id) DO UPDATE SET payload=excluded.payload",
-                    [.text(batch.profile.id.rawValue), .blob(try encoder.encode(batch.profile))])
+                    [.text(batch.profile.id.rawValue), .blob(try encoder.encode(profile))])
                 for chart in batch.charts { try putChart(chart) }
                 let catalog = try catalogUnlocked()
                 var added = 0, duplicate = 0, points = 0

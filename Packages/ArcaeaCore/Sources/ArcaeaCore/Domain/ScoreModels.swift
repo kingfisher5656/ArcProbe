@@ -132,7 +132,16 @@ public struct ScoreObservation: Hashable, Codable, Sendable {
 public struct AccountProfile: Hashable, Codable, Sendable {
     public let id: AccountID
     public let displayName: String?
-    public init(id: AccountID, displayName: String? = nil) { self.id = id; self.displayName = displayName }
+    /// Last observed equipped partner icon from the official account/friends response.
+    public let partnerIcon: String?
+    public init(id: AccountID, displayName: String? = nil, partnerIcon: String? = nil) {
+        self.id = id; self.displayName = displayName; self.partnerIcon = partnerIcon
+    }
+    public static func validPartnerIcon(_ value: String) -> Bool {
+        !value.isEmpty && value.utf8.count <= 256 && value.utf8.allSatisfy {
+            (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) || $0 == 95 || $0 == 45
+        }
+    }
 }
 
 public struct EffectiveObservation: Hashable, Codable, Sendable {

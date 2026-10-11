@@ -82,7 +82,22 @@ public enum OnlineParser {
         if let string = object["user_id"] as? String { key = string }
         else { key = String(try integer(object["user_id"], min: 0, max: 9_007_199_254_740_991)) }
         guard validIdentifier(key, maximum: 80) else { throw OnlineError.unsupportedResponse }
-        return AccountProfile(id: AccountID("online:\(key)"), displayName: object["name"] as? String)
+        return AccountProfile(id: AccountID("online:\(key)"), displayName: object["name"] as? String, partnerIcon: partnerIcon(object))
+    }
+
+    private static func partnerIcon(_ object: [String: Any]) -> String? {
+        func safe(_ raw: Any?) -> String? {
+            if let value = raw as? String { return AccountProfile.validPartnerIcon(value) ? value : nil }
+            if let number = try? integer(raw, min: 0, max: 1_000_000) { return String(number) }
+            return nil
+        }
+        if let icon = safe(object["icon"]) { return icon }
+        // user/me exposes the equipped character through character_stats; friends expose icon directly.
+        guard let equipped = try? integer(object["character"], min: 0, max: 1_000_000),
+              let stats = object["character_stats"] as? [[String: Any]], stats.count <= 10_000 else { return nil }
+        let matches = stats.filter { (try? integer($0["character_id"], min: 0, max: 1_000_000)) == equipped }
+        guard matches.count == 1 else { return nil }
+        return safe(matches[0]["icon"])
     }
 
     private static func score(_ row: [String: Any], account: AccountID, source: ObservationSource, now: Date) throws -> (ScoreObservation, ChartMetadata) {

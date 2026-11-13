@@ -19,33 +19,53 @@ final class ArcProbeUpdateTests: XCTestCase {
         XCTAssertThrowsError(try ConstantSnapshot.parse(Data("{}".utf8)))
     }
 
-    func testNotificationTokensAreDurableSingleUseAndStopInvalidatesThem() throws {
+    func testSongListSetsLevelsAddsNewChartsAndKeepsOfficialNames() throws {
         let url = temporaryArchiveURL()
-        let store = try NotificationPulseStore(url: url)
-        try store.configure(minimum: 65, maximum: 80)
-        XCTAssertThrowsError(try store.configure(minimum: 20, maximum: 80))
-        let generation = UUID()
-        let first = try store.start(generation: generation, now: testDate, randomDelay: 70)
-        let reopened = try NotificationPulseStore(url: url)
-        XCTAssertEqual(try reopened.state().token, first.token)
-        let next = try reopened.advance(token: first.token!, generation: generation, now: testDate.addingTimeInterval(70), randomDelay: 75)
-        XCTAssertNotEqual(next?.token, first.token)
-        XCTAssertNil(try store.advance(token: first.token!, generation: generation, now: testDate.addingTimeInterval(70), randomDelay: 70))
-        _ = try store.stop()
-        XCTAssertNil(try reopened.advance(token: next!.token!, generation: generation, now: testDate.addingTimeInterval(150), randomDelay: 70))
-        XCTAssertEqual(try reopened.state().minimumSeconds, 65)
-    }
-
-    func testNotificationGenerationAndCooldownPreventStaleOrEarlyCycles() throws {
-        let store = try NotificationPulseStore(url: temporaryArchiveURL())
-        let generation = UUID()
-        let first = try store.start(generation: generation, now: testDate, randomDelay: 70)
-        XCTAssertNil(try store.advance(token: first.token!, generation: UUID(), now: testDate.addingTimeInterval(70), randomDelay: 70))
-        XCTAssertNil(try store.advance(token: first.token!, generation: generation, now: testDate, randomDelay: 70))
-        let next = try store.advance(token: first.token!, generation: generation, now: testDate.addingTimeInterval(70), randomDelay: 70, notBefore: testDate.addingTimeInterval(600))
-        XCTAssertEqual(next?.nextAt, testDate.addingTimeInterval(600))
-        let replacement = try store.start(generation: UUID(), now: testDate, randomDelay: 75)
-        _ = try store.stop(expectedToken: next!.token)
-        XCTAssertEqual(try store.state().token, replacement.token)
+        let known = ChartID(songID: "testsong", difficulty: .future)
+        let renamed = ChartID(songID: "testsong", difficulty: .beyond)
+        let bundled = ChartCatalog(charts: [
+            ChartMetadata(id: known, constant: .init(tenths: 90), level: "8", title: "Official title", artist: "Official artist", artworkIdentifier: "cover", provenance: "bundled"),
+            ChartMetadata(id: renamed, constant: .init(tenths: 96), provenance: "bundled")])
+        let store = try ArchiveStore(url: url, catalog: bundled)
+        let data = Data(#"""
+        {"songs":[
+          {"id":"testsong","title_localized":{"en":"Last"},"artist":"onoken","difficulties":[
+            {"ratingClass":2,"rating":9},
+            {"ratingClass":3,"rating":9,"title_localized":{"en":"Last | Moment"}}]},
+          {"id":"lasteternity","title_localized":{"en":"Last | Eternity"},"artist":"onoken","difficulties":[
+            {"ratingClass":0,"rating":0},
+            {"ratingClass":3,"rating":9,"ratingPlus":true}]},
+          {"id":"dreadarea","title_localized":{"en":"DREAD AREA"},"artist":"x","difficulties":[
+            {"ratingClass":3,"ratingClassAlias":1,"rating":11},
+            {"ratingClass":9,"rating":5},
+            {"ratingClass":1,"rating":"odd"}]},
+          {"id":"particlearts","deleted":true},
+          {"unexpected":true}
+        ]}
+        """#.utf8)
+        let snapshot = try SongListSnapshot.parse(data)
+        XCTAssertEqual(snapshot.charts.count, 4)
+        XCTAssertEqual(try store.applySongList(snapshot), 4)
+        let catalog = try ArchiveStore(url: url, catalog: bundled).chartCatalog()
+        XCTAssertEqual(catalog[known]?.level, "9")
+        XCTAssertEqual(catalog[known]?.title, "Official title")
+        XCTAssertEqual(catalog[known]?.artist, "Official artist")
+        XCTAssertEqual(catalog[known]?.constant?.tenths, 90)
+        XCTAssertEqual(catalog[known]?.artworkIdentifier, "cover")
+        XCTAssertEqual(catalog[renamed]?.title, "Last | Moment")
+        let added = ChartID(songID: "lasteternity", difficulty: .beyond)
+        XCTAssertEqual(catalog[added]?.level, "9+")
+        XCTAssertEqual(catalog[added]?.title, "Last | Eternity")
+        XCTAssertNil(catalog[added]?.constant)
+        XCTAssertNil(catalog[ChartID(songID: "lasteternity", difficulty: .past)])
+        XCTAssertEqual(catalog[ChartID(songID: "dreadarea", difficulty: .beyond)]?.displayDifficulty, "INS")
+        XCTAssertNil(catalog[ChartID(songID: "dreadarea", difficulty: .present)])
+        // A second pass with the same list changes nothing, also after a constants refresh.
+        XCTAssertEqual(try store.applySongList(snapshot), 0)
+        try store.replaceConstants(ConstantSnapshot.parse(Data(#"{"testsong":[null,null,{"constant":9.1,"old":false}]}"#.utf8)))
+        XCTAssertEqual(try store.chartCatalog()[known]?.level, "9")
+        XCTAssertEqual(try store.applySongList(snapshot), 0)
+        XCTAssertThrowsError(try SongListSnapshot.parse(Data(#"{"songs":[]}"#.utf8)))
+        XCTAssertThrowsError(try SongListSnapshot.parse(Data(#"{"other":1}"#.utf8)))
     }
 }

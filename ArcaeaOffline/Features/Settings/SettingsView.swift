@@ -1,55 +1,78 @@
 import ArcaeaCore
 import SwiftUI
-import UniformTypeIdentifiers
 
+/// Top level of Settings: one row per area, details one tap away.
 struct SettingsView: View {
     @Environment(ArchiveModel.self) private var model
-    @State private var share: ShareFile?
-    @State private var restoring = false
-    @State private var restorePreview: BackupRestorePreview?
-    @State private var validating = false
+    @Environment(OnlineRuntime.self) private var runtime
     var body: some View {
-        Form {
-            Section("Archive") {
-                if model.profiles.count > 1 {
-                    Picker("Saved account", selection: Binding(get: { model.selectedAccountID }, set: { model.selectedAccountID = $0; model.perform { try model.reload() } })) { ForEach(model.profiles, id: \.id) { Text($0.displayName ?? $0.id.rawValue).tag(Optional($0.id)) } }
-                } else { LabeledContent("Saved account", value: model.selectedProfile?.displayName ?? model.selectedProfile?.id.rawValue ?? "Created on first manual entry") }
-                LabeledContent("Saved plays", value: String(model.observations.count))
-                LabeledContent("Chart bests", value: String(model.bestScores.count))
+        List {
+            if model.profiles.count > 1 {
+                Section {
+                    Picker("Showing scores for", selection: Binding(get: { model.selectedAccountID }, set: { model.selectedAccountID = $0; model.perform { try model.reload() } })) {
+                        ForEach(model.profiles, id: \.id) { Text($0.displayName ?? $0.id.rawValue).tag(Optional($0.id)) }
+                    }
+                }
             }
-            AccountSettingsSections()
-            LibrarySettingsSection()
-            NotificationSettingsSection()
+            Section("Accounts") {
+                NavigationLink { MainAccountView() } label: {
+                    SettingsRow(title: "Main account", detail: runtime.mainProfile.map { $0.displayName ?? $0.id.rawValue } ?? "Not signed in", systemImage: "person.crop.circle")
+                }.accessibilityIdentifier("settings.main")
+                NavigationLink { TrackerAccountView() } label: {
+                    SettingsRow(title: "Tracker account", detail: trackerDetail, systemImage: "binoculars", warning: runtime.recentNeedsAttention)
+                }.accessibilityIdentifier("settings.tracker")
+            }
+            Section("Automatic tracking") {
+                TrackingStatusCard()
+                NavigationLink { ShortcutSetupView() } label: { Label("Shortcut setup", systemImage: "square.2.layers.3d") }
+                    .accessibilityIdentifier("settings.shortcuts")
+            }
+            Section("Google Sheets") {
+                NavigationLink { SheetView() } label: { Label("Consultant sheet", systemImage: "tablecells") }
+                    .accessibilityIdentifier("settings.sheet")
+            }
+            Section("Library") {
+                NavigationLink { LibraryView() } label: { Label("Charts & cover art", systemImage: "photo.stack") }
+                    .accessibilityIdentifier("settings.library")
+                NavigationLink { BackupView() } label: { Label("Backup & restore", systemImage: "externaldrive") }
+                    .accessibilityIdentifier("settings.backup")
+            }
             Section {
-                Button("Export JSON backup", systemImage: "square.and.arrow.up") { model.perform { share = try model.backupFile() } }
-                Button("Restore JSON backup", systemImage: "square.and.arrow.down") { restoring = true }
+                LabeledContent("Version", value: AppInfo.version)
                 NavigationLink("Diagnostics") { DiagnosticsView() }
-            } header: { Text("Backup and recovery") } footer: { Text("Backups include saved accounts, scores, corrections, deletion markers, and history. Passwords and session cookies are excluded. Restore validates the whole file, then asks you to confirm replacing the saved archive.") }
-            Section("About") {
-                LabeledContent("App", value: "ArcProbe 0.2.11")
-                LabeledContent("Minimum version", value: "iOS / iPadOS 18")
-                Text("An unofficial, local score companion. This app reads account data and never uploads scores or modifies Arcaea.").font(.footnote).foregroundStyle(.secondary)
-                Text("Refresh chart constants and download official covers below your account settings. Cached covers remain available offline.").font(.footnote).foregroundStyle(.secondary)
+            } footer: {
+                Text("ArcProbe is unofficial. It only reads your Arcaea Online data and keeps everything on this device.")
             }
         }
-        .navigationTitle("Accounts & sync")
-        .sheet(item: $share) { ShareSheet(file: $0) }
-        .sheet(item: $restorePreview) { BackupRestoreReview(preview: $0) }
-        .overlay { if validating { ProgressView("Validating backup…").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16)) } }
-        .fileImporter(isPresented: $restoring, allowedContentTypes: [.json]) { result in
-            Task {
-                validating = true
-                defer { validating = false }
-                do {
-                    let url = try result.get()
-                    let opened = url.startAccessingSecurityScopedResource()
-                    defer { if opened { url.stopAccessingSecurityScopedResource() } }
-                    restorePreview = try await Task.detached(priority: .userInitiated) {
-                        let data = try Data(contentsOf: url, options: .mappedIfSafe)
-                        return try BackupRestorePreview.validate(data)
-                    }.value
-                } catch { model.errorMessage = error.localizedDescription }
-            }
+        .navigationTitle("Settings")
+        .task { await runtime.refreshStatus() }
+    }
+    private var trackerDetail: String {
+        if runtime.recentNeedsAttention { return "Needs sign-in" }
+        guard let profile = runtime.recentProfile else { return "Not set up" }
+        return profile.displayName ?? profile.id.rawValue
+    }
+}
+
+struct SettingsRow: View {
+    let title: String
+    let detail: String
+    let systemImage: String
+    var warning = false
+    var body: some View {
+        HStack {
+            Label(title, systemImage: systemImage)
+            Spacer()
+            if warning { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange) }
+            Text(detail).foregroundStyle(.secondary).lineLimit(1)
         }
+    }
+}
+
+enum AppInfo {
+    static var shortVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?" }
+    static var version: String {
+        let info = Bundle.main.infoDictionary ?? [:]
+        return "\(info["CFBundleShortVersionString"] as? String ?? "?") (\(info["CFBundleVersion"] as? String ?? "?"))"
     }
 }

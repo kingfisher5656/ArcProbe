@@ -46,7 +46,18 @@ final class RatingTests: XCTestCase {
             let expected: Int64 = [1, 2, 3, 5].contains(clear.rawValue) ? 7_320_000 : 7_200_000
             XCTAssertEqual(try RatingCalculator.play(constant: constant, score: 10_000_000, clear: clear), expected)
         }
-        XCTAssertEqual(try RatingCalculator.play(constant: constant, score: 10_000_000, clear: nil), 7_200_000)
+        XCTAssertEqual(try RatingCalculator.play(constant: constant, score: 10_000_000, clear: nil), 7_320_000)
+    }
+
+    func testUnknownClearUsesNormalBonusWithoutChangingStoredClear() throws {
+        let play = observation("unknown-clear", score: 10_000_000)
+        let calculator = RatingCalculator(catalog: ChartCatalog(charts: [ChartMetadata(id: testChart, constant: ChartConstant(tenths: 100), provenance: "test")]))
+        let result = try calculator.rank(observations: [play])
+        XCTAssertEqual(result.rows.first?.ratingUnits, 7_320_000)
+        XCTAssertNil(result.rows.first?.best.bestClear)
+        XCTAssertNil(result.rows.first?.best.values.playClear)
+        XCTAssertEqual(result.unknownClears, 1)
+        XCTAssertEqual(try RatingCalculator.play(constant: ChartConstant(tenths: 100), score: 10_000_000, clear: .trackLost), 7_200_000)
     }
 
     func testSparseRankingUsesZeroForMissingSlotsAndSkipsOutdatedConstants() throws {

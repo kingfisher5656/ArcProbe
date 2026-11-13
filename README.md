@@ -1,102 +1,83 @@
 # ArcProbe
 
-iPadOS에서 구동되는 아르케아 점수 기록/관리 어플입니다. 현재 다음과 같은 기능을 지원합니다.
+iPadOS에서 구동되는 아르케아 점수 기록/관리 어플입니다.
+
 - Arcaea Online과의 점수, B50, 포텐 그래프 동기화
-- 별도의 친구 계정 및 iOS 자동화를 통한 아르케아 최근 기록 자동으로 불러오기
-- B50 포텐 계산, 점수 관리 및 포텐 그래프 표시
-- 자동 입력 오작동 시 사용될 수 있는 수동 점수 입력
+- 별도의 친구 계정과 iOS 단축어 자동화를 이용한 최근 플레이 자동 기록
+- B50 포텐 계산, B50 JPG 내보내기, 전체 점수 관리, 포텐 변화 그래프
+- Arcaea consultant 구글 시트와의 점수 가져오기/보내기
+- 수동 점수 입력 및 수정
 
-해당 프로젝트 내의 모든 코드는 AI를 통해 생성되었습니다.
-실용적인 프로그램이라기보다 무엇이 가능한지 실증하는 테스트형태의 프로그램으로 봐주시길 부탁드립니다.
+해당 프로젝트 내의 모든 코드는 AI를 통해 생성되었습니다. 실용적인 프로그램이라기보다 무엇이 가능한지 실증하는 테스트 형태의 프로그램으로 봐주시길 부탁드립니다.
 
-ArcProbe의 기능은 iPadOS 18에서 테스트되었습니다. iPadOS 27에서는 단축어 및 자동화 작동 방식의 변경으로 인해 오작동할 수 있습니다.
+iPadOS 18에서 테스트되었습니다.
 
 ## 설치 및 사용법
 
-- Sidestore를 통해 Releases의 IPA 파일을 설치 (Livecontainer 내 설치는 지원하지 않음)
-- 설치 후, ArcProbe 앱 내 Settings - Main Account 탭에서 Arcaea Online에 구독된 주 사용 계정 로그인
-- Import all scores and five-year history 버튼을 눌러 Arcaea Online과 기록 동기화
-- 앱 내 Settings - Recent Account, Separate Session 탭에서 Recent source를 Friend target (burner)로 선택
-- Settings - Recent Account, Separate Session 탭에서 주 사용 계정을 친구로 등록한 별도의 계정 로그인
-- 해당 단축어를 다운받음: https://www.icloud.com/shortcuts/b80ac073eddb41ed8a43ab7d29efcd69
-- 위 단축어를 자동화의 'Arcaea' 앱이 열릴 때에 할당함
-- 해당 단축어를 다운받음: https://www.icloud.com/shortcuts/a571bcf2072445fa9e807a892316b545
-- 위 단축어를 자동화의 'Arcaea' 앱이 닫힐 때에 할당함
+1. SideStore를 통해 Releases의 IPA 파일을 설치합니다. (LiveContainer 내 설치는 지원하지 않음)
+2. ArcProbe 우측 상단 톱니바퀴(Settings) → **Main account** 에서 Arcaea Online을 구독 중인 주 계정으로 로그인하고, **Import scores and potential history** 를 눌러 기록을 가져옵니다.
+3. Settings → **Tracker account** 에서 주 계정을 친구로 등록해 둔 별도의 계정으로 로그인합니다. 로그인이 만료되어도 자동으로 다시 로그인되게 하려면 **Save password for automatic re-login** 을 설정합니다.
+4. 단축어 앱에서 아래 단축어와 자동화 두 개를 만듭니다. 앱 안의 Settings → **Shortcut setup** 에도 같은 내용이 있습니다.
 
-위 과정을 거치면 Arcaea가 열린 후 65~80초에 한번씩 아르케아 서버에서 최근 기록을 가져오는 단축어가 실행되며, Arcaea 종료 시 단축어가 종료됩니다.
-최근 기록은 ArcProbe 어플 내에 기록됩니다.
+**단축어 "ArcProbe tracking"**
 
-iPadOS 27+ 에서는 자동화로 실행된 단축어가 4분 이상 실행될 수 없어 Arcaea 앱이 열릴 때 단축어가 실행되는 기능을 사용할 수 없습니다.
-해당 제한은 단축어 내부에 Arcaea를 여는 행동을 추가하고 단축어를 수동으로 실행시키는 방법으로 우회가 가능할 수 있습니다.
+| # | 동작 | 설정 |
+|---|---|---|
+| 1 | Start Arcaea Tracking | |
+| 2 | 반복 | 1000번 |
+| 3 | &nbsp;&nbsp;Check Recent Play | Session = 1번 동작의 결과 |
+| 4 | &nbsp;&nbsp;조건문: Check Recent Play 결과가 1보다 작으면 → 이 단축어 중단 | |
+| 5 | &nbsp;&nbsp;대기 | 시간 = Check Recent Play의 결과 |
+| 6 | 반복 종료 | |
 
-iPadOS 27+ 에는 제어 센터를 내렸을 시 앱이 닫힐 때 실행되는 자동화가 실행되는 버그가 있습니다. 
-해당 버그로 인하여 Arcaea가 닫히지 않았음에도 불구하고 최근기록 자동 불러오기가 중지될 수 있습니다.
+**자동화**
 
-아래는 챗GPT가 자동으로 생성한 Readme 파일입니다.
+| 조건 | 실행 |
+|---|---|
+| Arcaea 앱이 열릴 때 | 단축어 "ArcProbe tracking" 실행 |
+| Arcaea 앱이 닫힐 때 | Stop Arcaea Tracking |
 
-## Included
+두 자동화 모두 "즉시 실행"으로 설정합니다.
 
-- Local score browsing, manual entry, corrections, deletion and undo without a subscription.
-- A separate main-account login for importing the website's exposed score pages and returned five-year potential history.
-- An independent recent-account login, with explicit own-account testing and friend-target modes.
-- One-shot background Shortcuts actions, saved cookies, bounded session renewal and persisted request cooldowns.
-- Large artwork Best 50 cards, official potential history with a post-sync estimated continuation, history range sliders, play-rating sorting, JSON archive backup/restore, and Best 50 JPG/CSV export.
-- On-demand Miraheze chart-constant refresh, cover downloads, and portable cover-art backup/restore.
-- Experimental iOS 27 notification automation actions, alongside the existing iOS 18 tracking method.
+이후 Arcaea가 열려 있는 동안 65~80초마다 최근 기록을 확인해 ArcProbe에 저장하고, Arcaea를 닫으면 두 번 더 확인한 뒤 단축어가 스스로 종료됩니다. 확인 주기와 종료 시점은 앱이 정하므로 단축어를 수정할 필요가 없습니다. Arcaea를 빠르게 여러 번 닫았다 열어도 가장 최근에 시작된 단축어 하나만 남고 확인 주기는 그대로 이어집니다.
 
-Official history and local estimates stay separate. Constants are a dated snapshot; estimates are not a guarantee of the current official rating. Missing fields and dates remain unknown. Website imports capture the data exposed by the website; they cannot recover every historical play. Official cover artwork can be downloaded after importing scores and stays cached offline.
+0.2.x에서 업데이트하는 경우 기존 단축어(Set Tracking Active / Get Tracking Status / Fetch Recent Play를 쓰던 것)는 더 이상 동작하지 않습니다. 삭제하고 위 단축어로 다시 만들어 주세요.
 
-## Install and configure
+iPadOS 27 이상에서는 자동화로 실행된 단축어가 오래 실행되지 못하거나, 제어 센터를 내릴 때 "앱이 닫힐 때" 자동화가 실행되는 문제가 있을 수 있습니다. 이 경우 Arcaea를 다시 열면 추적이 다시 시작됩니다.
 
-The generated `artifacts/ArcProbe-0.2.11.ipa` is an unsigned iPhoneOS arm64 package. Import it into SideStore for signing and installation. It is not a pre-signed IPA. Direct installation is the intended path for Shortcuts; LiveContainer background-action discovery has not been verified.
+---
 
-1. Open **Accounts & sync** and sign into the main account using the official login page. Confirm **Use signed-in account**, then run the full import. This account needs an active Arcaea Online subscription.
-2. Set up the **Recent account** independently. For now choose **Own account (testing)** and sign in with the same main account identity. The two sessions remain isolated.
-3. Later, connect a burner account that is already friends with the main account, select **Friend target (burner)**, and configure it again. The connected main account supplies the target identity.
-4. Configure automatic renewal in the app or using the setup Shortcut action. Credentials are held in the device Keychain; remove literal passwords from the saved setup Shortcut afterward. Recurring fetches do not take passwords.
-5. In **Chart data & cover art**, refresh constants and download missing official covers after importing scores. For larger originals, choose **Download sharper wiki covers**, then start the download in the wiki screen. The app follows song articles and original-file links, checks song IDs and difficulty labels, and keeps Beyond artwork separate. Keep that screen open. Unmatched charts retain official covers. Artwork requests use separate sessions without account login cookies. Keep the app open while downloading; completed covers survive cancellation.
-6. Follow the in-app **Shortcut setup instructions** and [detailed recipes](docs/shortcuts/setup.md).
+## What it does
 
-The app does not schedule a guaranteed minute-by-minute background task. A bounded Shortcut loop can request a fetch about every 70 seconds, but iPadOS may suspend it. Each request respects an optional 60-second minimum (enabled by default) and server cooldowns. Disable the app minimum in Settings → Tracking and Shortcuts; existing Shortcut Wait actions remain unchanged. Sustained timing, SideStore action discovery and burner access require testing on the physical iPad. If a website challenge appears, open the role's official login in the app; repeated automated login is not attempted.
+- **Best 50** with estimated potential, and export as JPG or CSV.
+- **Scores**: every chart best, with manual add, edit, delete and undo.
+- **Recent**: plays recorded automatically while Arcaea is open.
+- **Potential**: official history from Arcaea Online plus a local estimate for plays since the last import.
+- **Consultant sheet** (Settings): import mobile scores from, or send them to, your Arcaea consultant workbook in Google Sheets. Always previewed and confirmed first.
+- **Backup**: scores as JSON, downloaded cover art as a separate file.
 
-## Potential graph
+Everything is stored on the device. ArcProbe only reads from Arcaea Online; it never uploads scores or touches the game.
 
-One graph shows **official history in purple** and an **estimated continuation in orange**. Imported official values are never reconstructed or changed by score edits. A full score/history sync stores an immutable score baseline and the last official point. Later plays and edits with achieved dates after that sync adjust only the orange continuation, using the change in saved-score potential relative to the baseline and adding that change to the official anchor value. Undated new plays use their first recorded time. A new full sync advances the baseline; covered estimates are replaced by official observations.
+## Automatic tracking
 
-The old Local · Best 50 history view has been removed. Existing installations need one full Arcaea Online import after this update to establish a trustworthy baseline; old official history remains available before then. No earlier potential is inferred from current chart bests. Plays/edits dated at or before the sync do not affect the continuation. Orange values remain estimates and can differ from the server.
+See [docs/shortcuts.md](docs/shortcuts.md) for the setup and for how the loop behaves when Arcaea is reopened quickly, when the connection drops, or when the tracker login expires.
 
-JSON backup/restore includes official history, the frozen sync baseline, source plays and edits. The orange continuation rebuilds from the restored data. Older JSON backups remain importable but need a new full sync to establish a baseline.
+## Build
 
-## Recovery and privacy
-
-Export a JSON backup before reinstalling or changing signing identity. Also use **Chart data & cover art → Export cover backup**, then save the `.arcprobe-covers` file outside the app (for example, iCloud Drive). After reinstalling, restore the JSON archive and use **Restore cover backup** to import the image file. Cover backups preserve original image bytes, official cache identifiers, and difficulty-specific wiki keys; restoring merges covers and retains equal/higher-resolution existing images. Validation happens before installation; a disk-write failure can leave a partial merge with completed covers usable. Cover backups are limited to 12,000 images, 8 MiB per image, and 2 GiB total. Restore validates the file and asks before replacing the saved archive. Backups include scores, corrections, deletion markers and history, but not session cookies or credentials. Disconnecting a login preserves the archive. A new signing identity may require account reconfiguration; update/re-sign persistence remains a device acceptance check.
-
-Account requests go to lowiro's official website API. The app neither uploads scores nor accesses or modifies Arcaea's game files. No analytics service or developer relay is used. Exported files contain your selected archive data; share them intentionally.
-
-## Build and verification
-
-See the versioned release report for test/build evidence. Simulator checks do not establish sustained notification automation on physical iOS 27 devices. The user reports that the original iOS 18 loop works on their iPad.
-
-The app uses SwiftUI, App Intents, WebKit, Keychain and a local Swift package backed by SQLite. No third-party package manager is required.
+No third-party tooling is needed besides Xcode. The Xcode project is generated from the files on disk.
 
 ```sh
 swift test --package-path Packages/ArcaeaCore
 python3 scripts/generate-project.py
 xcodebuild test -project ArcaeaOffline.xcodeproj -scheme ArcaeaOffline \
-  -destination 'platform=iOS Simulator,id=YOUR_SIMULATOR_ID'
-zsh scripts/package-ipa.sh
+  -destination 'platform=iOS Simulator,name=iPad Pro 11-inch (M4)'
+zsh scripts/package-ipa.sh   # unsigned IPA in artifacts/, sign and install with SideStore
 ```
 
-Use an installed iOS 18+ simulator and a current Xcode supporting the deployment target. Packaging writes its build log under `build/package` and IPA/checksum under `artifacts`. See [release verification](docs/verification/arcprobe-0.2.11.md) for actual checks and untested device requirements. The website adapter is based on inspected official frontend contracts and synthetic regression fixtures; real authenticated app import is a separate acceptance test.
+## Notes
 
-See [notices](NOTICE.md) for metadata attribution. The sibling ArcPotApk project is a read-only reference and is not a build dependency.
-
-## Best 50 image export
-
-Share B50 JPG uses a 1800 × 3208 portrait with a five-column, ten-row grid, a pale lavender background, player/potential banner, large cached song covers, gold top-ten ratings, score overlays, and difficulty/clear diamonds. Its layout follows the supplied Arcaea Online reference while retaining ArcProbe branding and identifying potential as an estimate. It does not bundle the reference image, the reference account information.
-
-Export uses downloaded artwork (difficulty-specific wiki artwork first, then the official cover). Download or restore covers in Settings before exporting; missing art uses a placeholder and export does not log in or download song covers. Unknown levels, ratings, and clear statuses stay unknown. The clear badge shows the saved chart-best clear; CSV retains full source/date details.
-
-The header diamond shows the selected account’s last observed equipped partner, updated through recent friend fetches or main-account imports. Export downloads the small portrait from the official public asset server once and caches it for offline use. If no partner is known, fetch recent once; failed or unavailable portraits use a neutral placeholder. The portrait identifier is included in JSON backups; its separate image cache can be downloaded again after reinstalling. The potential badge overlaps the portrait’s lower-right edge and uses the official rank backgrounds (one star at 12.000, two at 12.500, three at 13.000). The estimate note appears only in the footer.
-
-JPG typography uses bundled SIL Open Font License families: Exo for header potential, Exo 2 for numeric/card text and the player name, Titillium Web for titles and small labels, and Open Sans for the generated date. Fractional header potential digits use 16/22 of the whole-number font size on a shared baseline. These are close open-source matches, not a claim that the server-generated official JPG uses identical settings. Font licenses ship in the app’s Fonts folder; see [font sources](docs/export-fonts.md).
+- Export a JSON backup (Settings → Backup & restore) before reinstalling or changing the signing identity.
+- Potential values computed by ArcProbe are estimates from a dated chart-constant table and can differ from the server.
+- After a game update adds songs, use Settings → Charts & cover art → **Update constants and levels** to fetch the new constants, levels and song names from the Arcaea community wiki.
+- Google sign-in for the sheet feature is in Google's testing mode, so it asks to reconnect about once a week. See [docs/google-sheets-setup.md](docs/google-sheets-setup.md).
+- Attribution and licenses: [NOTICE.md](NOTICE.md), [B50 export fonts](docs/export-fonts.md).

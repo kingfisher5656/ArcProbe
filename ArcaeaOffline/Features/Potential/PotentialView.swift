@@ -75,7 +75,7 @@ struct PotentialView: View {
                     Slider(value: Binding(get: { upper }, set: { upper = max($0, lower); range = .custom }), in: 0...1).accessibilityLabel("History range end")
                 }.font(.subheadline).disabled(historyDates.count < 2)
 
-                if points.isEmpty { ContentUnavailableView("No history in this range", systemImage: "chart.xyaxis.line", description: Text("Import your main account’s official history in Settings, or choose another date range.")).frame(height: 350) }
+                if points.isEmpty { ContentUnavailableView("No history in this range", systemImage: "chart.xyaxis.line", description: Text("Import your main account in Settings, or choose another range.")).frame(height: 350) }
                 else {
                     Chart {
                         ForEach(displayedOfficial, id: \.sourceID) { point in
@@ -101,14 +101,10 @@ struct PotentialView: View {
                     Label("Official data through \(DisplayFormat.date(last.timestamp))", systemImage: "checkmark.shield")
                         .font(.subheadline).foregroundStyle(.purple)
                 }
-                if let synced = model.potentialSyncDate {
-                    Text("Orange continues from the last official value using changes in saved-score potential after the full sync on \(synced.formatted(date: .abbreviated, time: .shortened)). Later score and date edits recalculate only this estimate. Official history is never rewritten.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                } else {
-                    Text("Run a full Arcaea Online import to establish the score baseline for the orange continuation. Existing official history stays unchanged; no older potential is reconstructed.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
-                Text("JSON backup preserves official history, the sync baseline, and later score changes.").font(.footnote).foregroundStyle(.secondary)
+                Text(model.potentialSyncDate == nil
+                     ? "Orange is ArcProbe’s own estimate. Import your main account in Settings to add official history."
+                     : "Purple is official history up to your last import. Orange is ArcProbe’s estimate from plays saved since then.")
+                    .font(.footnote).foregroundStyle(.secondary)
             }.padding(24).frame(maxWidth: 1250).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24)).padding(24)
         }.background(Color(.systemGroupedBackground)).navigationTitle("Potential history")
         .task { syncPresetSliders(); rebuildSeries() }

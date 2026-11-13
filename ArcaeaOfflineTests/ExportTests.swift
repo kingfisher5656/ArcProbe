@@ -53,7 +53,7 @@ import UIKit
     func testReferenceScoreFormattingAndUnknownClear() {
         XCTAssertEqual(B50PosterRenderer.score(9_904_038), "09’904’038")
         XCTAssertEqual(B50PosterRenderer.score(10_001_234), "10’001’234")
-        XCTAssertEqual(B50PosterRenderer.clearSymbol(nil), "?")
+        XCTAssertEqual(B50PosterRenderer.clearSymbol(nil), "C")
         XCTAssertEqual(B50PosterRenderer.clearSymbol(.fullRecall), "F")
         XCTAssertEqual(B50PosterRenderer.clearSymbol(.pureMemory), "P")
     }

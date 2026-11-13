@@ -31,7 +31,20 @@ public struct ChartMetadata: Hashable, Codable, Sendable {
 
 public struct ChartCatalog: Sendable {
     public let charts: [ChartID: ChartMetadata]
-    public init(charts: [ChartMetadata]) { self.charts = Dictionary(charts.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new }) }
+    public init(charts: [ChartMetadata]) {
+        self.charts = Dictionary(charts.map { chart in
+            (chart.id, Self.fillingMissingTitle(chart))
+        }, uniquingKeysWith: { _, new in new })
+    }
+    private static func fillingMissingTitle(_ chart: ChartMetadata) -> ChartMetadata {
+        let title = chart.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard title == nil || title == "" || title == chart.id.songID,
+              let fallback = BundledSongTitles.canonical[chart.id] else { return chart }
+        return ChartMetadata(id: chart.id, constant: chart.constant, isOutdated: chart.isOutdated,
+            level: chart.level, difficultyLabel: chart.difficultyLabel, noteCount: chart.noteCount,
+            title: fallback, artist: chart.artist, artworkIdentifier: chart.artworkIdentifier,
+            provenance: chart.provenance)
+    }
     public subscript(id: ChartID) -> ChartMetadata? { charts[id] }
     public static func bundled() throws -> ChartCatalog {
         struct ConstantEntry: Decodable { let constant: Decimal; let old: Bool }
@@ -71,4 +84,29 @@ public struct ChartCatalog: Sendable {
         for chart in charts.values { try ArchiveValidation.metadata(chart) }
         return ChartCatalog(charts: Array(charts.values))
     }
+}
+
+internal struct SongTitleAlias: Decodable, Sendable {
+    let songID: String
+    let difficulty: Int
+    let title: String
+}
+
+/// Canonical game titles appear first in the bundled resource; sheet/localized aliases follow.
+internal enum BundledSongTitles {
+    static let aliases: [SongTitleAlias] = {
+        guard let url = Bundle.module.url(forResource: "consultant-title-aliases", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let aliases = try? JSONDecoder().decode([SongTitleAlias].self, from: data) else { return [] }
+        return aliases
+    }()
+    static let canonical: [ChartID: String] = {
+        var titles: [ChartID: String] = [:]
+        for alias in aliases {
+            guard let difficulty = Difficulty(rawValue: alias.difficulty) else { continue }
+            let id = ChartID(songID: alias.songID, difficulty: difficulty)
+            if titles[id] == nil { titles[id] = alias.title }
+        }
+        return titles
+    }()
 }

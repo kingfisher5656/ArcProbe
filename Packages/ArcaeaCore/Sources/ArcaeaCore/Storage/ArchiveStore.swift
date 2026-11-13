@@ -39,6 +39,7 @@ public final class ArchiveStore: @unchecked Sendable {
                     [.text(batch.profile.id.rawValue), .blob(try encoder.encode(profile))])
                 for chart in batch.charts { try putChart(chart) }
                 let catalog = try catalogUnlocked()
+                let officialAuthority = try prepareOfficialImport(batch)
                 var added = 0, duplicate = 0, points = 0
                 for incoming in batch.observations {
                     guard incoming.accountID == batch.profile.id else { throw ArchiveError.accountMismatch }
@@ -58,9 +59,13 @@ public final class ArchiveStore: @unchecked Sendable {
                     try ArchiveValidation.potential(point)
                     let key: [SQLValue] = [.text(point.accountID.rawValue), .text(point.series.rawValue), .text(point.sourceID)]
                     if let existing: PotentialPoint = try record("SELECT payload FROM potential_points WHERE account_id=? AND series=? AND source_id=?", key) {
-                        guard existing.timestamp.milliseconds == point.timestamp.milliseconds,
-                              existing.value.equivalent(to: point.value) else {
+                        guard existing.timestamp.milliseconds == point.timestamp.milliseconds else {
                             throw ArchiveError.identityCollision(point.sourceID)
+                        }
+                        if !existing.value.equivalent(to: point.value) {
+                            guard officialAuthority, point.series == .official else { throw ArchiveError.identityCollision(point.sourceID) }
+                            try database.execute("UPDATE potential_points SET payload=? WHERE account_id=? AND series=? AND source_id=?",
+                                [.blob(try encoder.encode(point))] + key)
                         }
                     } else {
                         try database.execute("INSERT INTO potential_points(account_id, series, source_id, payload) VALUES(?, ?, ?, ?)",

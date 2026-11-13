@@ -30,7 +30,7 @@ public struct RatingCalculator: Sendable {
         return max(0, Int64(constant.tenths) * 60_000 + modifier)
     }
     public static func play(constant: ChartConstant, score: Int, clear: ClearType?) throws -> Int64 {
-        try base(constant: constant, score: score) + (clear?.hasRatingBonus == true ? scale / 5 : 0)
+        try base(constant: constant, score: score) + ((clear ?? .normal).hasRatingBonus ? scale / 5 : 0)
     }
     public static func display(_ units: Int64, rounded: Bool = false) -> String {
         let milli = (units + (rounded ? 300 : 0)) / 600
@@ -69,6 +69,6 @@ public struct RatingCalculator: Sendable {
         return RankingSnapshot(rows: rows, potentialUnits: weighted / 60, best50AverageUnits: sum / 50,
                                missingConstants: rows.filter { $0.ratingUnits == nil }.count,
                                unknownClears: rows.filter { $0.best.bestClear == nil }.count,
-                               ruleVersion: "arcpot-2026-09", isEstimate: true)
+                               ruleVersion: "arcprobe-2026-10-normal-fallback", isEstimate: true)
     }
 }

@@ -16,7 +16,7 @@ enum DisplayFormat {
         return switch clear { case .trackLost: "Track Lost"; case .normal: "Normal Clear"; case .fullRecall: "Full Recall"; case .pureMemory: "Pure Memory"; case .easy: "Easy Clear"; case .hard: "Hard Clear" }
     }
     static func source(_ source: ObservationSource) -> String {
-        switch source { case .officialImport: "Official import"; case .officialRecent: "Official recent"; case .manual: "Manual entry" }
+        switch source { case .officialImport: "Official import"; case .officialRecent: "Official recent"; case .manual: "Manual entry"; case .consultantSheet: "Consultant sheet" }
     }
 }
 

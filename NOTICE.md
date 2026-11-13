@@ -6,6 +6,8 @@ The dated chart metadata and inherited rating calculation have their provenance 
 
 The app uses Apple system frameworks and SQLite supplied by the operating system. It does not embed the Android application or require its files at runtime.
 
+Google sign-in for the consultant-sheet feature uses [AppAuth for iOS](https://github.com/openid/AppAuth-iOS) (Apache License 2.0); its license text ships in the app under ThirdPartyLicenses. B50 export fonts are covered in [docs/export-fonts.md](docs/export-fonts.md).
+
 User-requested constant refreshes use the same Arcaea Wiki source and attribution. Optional artwork downloads use official lowiro web assets referenced by imported account metadata; cached artwork remains the property of its respective rights holders and is not bundled in the IPA.
 
 Optional higher-resolution jackets are fetched from original files linked by Arcaea Fan Wiki song articles at https://arcaea.miraheze.org/wiki/Song_list . Wiki metadata attribution: Arcaea Wiki contributors, CC BY-SA 4.0 unless otherwise stated. Jacket copyright remains with the credited artists and rights holders. Downloaded originals are stored locally and are not redistributed in the app package.

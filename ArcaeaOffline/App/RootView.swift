@@ -4,14 +4,14 @@ import ArcaeaCore
 struct RootView: View {
     @Environment(ArchiveModel.self) private var model
     var body: some View {
+        // Four tabs fit the iPad's top bar in every orientation; a fifth scrolls out of view.
+        // Settings is therefore a gear button on each tab instead of a tab.
         TabView {
-            Tab("Best 50", systemImage: "square.grid.2x2") { NavigationStack { OverviewView() } }
-            Tab("Scores", systemImage: "music.note.list") { NavigationStack { ScoresView() } }
-            Tab("Recent", systemImage: "clock.arrow.circlepath") { NavigationStack { RecentView() } }
-            Tab("Potential", systemImage: "chart.xyaxis.line") { NavigationStack { PotentialView() } }
-            Tab("Settings", systemImage: "gearshape") { NavigationStack { SettingsView() } }
+            Tab("Best 50", systemImage: "square.grid.2x2") { NavigationStack { OverviewView().settingsButton() } }
+            Tab("Scores", systemImage: "music.note.list") { NavigationStack { ScoresView().settingsButton() } }
+            Tab("Recent", systemImage: "clock.arrow.circlepath") { NavigationStack { RecentView().settingsButton() } }
+            Tab("Potential", systemImage: "chart.xyaxis.line") { NavigationStack { PotentialView().settingsButton() } }
         }
-        .tabViewStyle(.sidebarAdaptable)
         .tint(.purple)
         .overlay(alignment: .bottom) {
             if let notice = model.notice {
@@ -30,14 +30,44 @@ struct RootView: View {
     }
 }
 
+private struct SettingsButton: ViewModifier {
+    @Environment(OnlineRuntime.self) private var runtime
+    @State private var showing = false
+    func body(content: Content) -> some View {
+        content
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showing = true } label: {
+                        Image(systemName: "gearshape")
+                            .overlay(alignment: .topTrailing) {
+                                if runtime.recentNeedsAttention { Circle().fill(.orange).frame(width: 9, height: 9).offset(x: 3, y: -3) }
+                            }
+                    }
+                    .accessibilityLabel(runtime.recentNeedsAttention ? "Settings, tracker needs attention" : "Settings")
+                    .accessibilityIdentifier("openSettings")
+                }
+            }
+            .navigationDestination(isPresented: $showing) { SettingsView() }
+    }
+}
+extension View {
+    /// Adds the gear that opens Settings. Use on the root screen of each tab.
+    func settingsButton() -> some View { modifier(SettingsButton()) }
+}
+
 struct ChartBadge: View {
     @Environment(ArchiveModel.self) private var model
     let chart: ChartID
     var level: String? = nil
     var body: some View {
-        Text((model.catalog[chart]?.displayDifficulty ?? chart.difficulty.label) + (level.map { "  \($0)" } ?? ""))
+        let difficulty = model.catalog[chart]?.displayDifficulty ?? chart.difficulty.label
+        // INS shares BYD's stored difficulty; match its exported diamond's #283D8C blue.
+        let color = difficulty.uppercased() == "INS"
+            ? Color(red: 40.0 / 255, green: 61.0 / 255, blue: 140.0 / 255)
+            : chart.difficulty.color
+        Text(difficulty + (level.map { "  \($0)" } ?? ""))
             .font(.caption.weight(.bold)).padding(.horizontal, 8).padding(.vertical, 4)
-            .foregroundStyle(chart.difficulty.color).background(chart.difficulty.color.opacity(0.12), in: Capsule())
+            .foregroundStyle(color).background(color.opacity(0.12), in: Capsule())
     }
 }
 

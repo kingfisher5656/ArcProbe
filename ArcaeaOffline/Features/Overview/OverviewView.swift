@@ -17,9 +17,9 @@ struct OverviewView: View {
                             NavigationLink { ScoreDetailView(chart: row.best.chartID) } label: { BestScoreCard(row: row) }.buttonStyle(.plain)
                         }
                     }
-                    Text("Local estimates use the dated chart-constant snapshot. Unknown or outdated constants remain unrated.").font(.footnote).foregroundStyle(.secondary)
+                    Text("Ratings are estimates from the saved chart constants. Charts without a known constant are unrated.").font(.footnote).foregroundStyle(.secondary)
                 } else {
-                    ContentUnavailableView("Your archive starts here", systemImage: "music.note", description: Text("Import your account in Settings, or add a score offline in Scores."))
+                    ContentUnavailableView("Your archive starts here", systemImage: "music.note", description: Text("Import your account in Settings (the gear button), or add a score in Scores."))
                         .frame(maxWidth: .infinity).padding(.vertical, 36)
                 }
             }.padding(24).frame(maxWidth: 1450)

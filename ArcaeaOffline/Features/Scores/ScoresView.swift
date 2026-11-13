@@ -26,7 +26,7 @@ struct ScoresView: View {
                 }
             }
         }
-        .overlay { if model.bestScores.isEmpty { ContentUnavailableView("No saved scores", systemImage: "music.note.list", description: Text("Tap + to record a play. Everything works offline.")) } else if filtered.isEmpty { ContentUnavailableView.search(text: query) } }
+        .overlay { if model.bestScores.isEmpty { ContentUnavailableView("No saved scores", systemImage: "music.note.list", description: Text("Tap + to add a score, or import your account in Settings.")) } else if filtered.isEmpty { ContentUnavailableView.search(text: query) } }
         .navigationTitle("Scores").searchable(text: $query, prompt: "Search song title or ID")
         .toolbar { Button("Add score", systemImage: "plus") { editor = .add }.accessibilityIdentifier("addScore") }
         .sheet(item: $editor) { ScoreEditorView(destination: $0) }

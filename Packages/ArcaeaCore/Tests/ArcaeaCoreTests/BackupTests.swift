@@ -68,4 +68,15 @@ final class BackupTests: XCTestCase {
         XCTAssertFalse(restored.contains("synthetic-cookie"))
         XCTAssertEqual(try existing.sourceObservations(accountID: otherAccount).map(\.id.rawValue), ["incoming"])
     }
+    func testNewBackupVersionStillRestoresLegacyVersionOne() throws {
+        let source = try ArchiveStore(url: temporaryArchiveURL())
+        _ = try source.apply(batch: ImportBatch(profile: AccountProfile(id: testAccount), observations: [observation("legacy-score")]))
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: ArchiveBackup(store: source).export()) as? [String: Any])
+        XCTAssertEqual(payload["schemaVersion"] as? Int, 2)
+        payload["schemaVersion"] = 1
+        let restored = try ArchiveStore(url: temporaryArchiveURL())
+        _ = try ArchiveBackup(store: restored).validateAndRestore(data: JSONSerialization.data(withJSONObject: payload))
+        XCTAssertEqual(try restored.sourceObservations(accountID: testAccount).map(\.id.rawValue), ["legacy-score"])
+    }
+
 }

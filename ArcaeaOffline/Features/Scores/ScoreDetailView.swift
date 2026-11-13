@@ -30,6 +30,9 @@ struct ScoreDetailView: View {
                         HStack { Text(DisplayFormat.score(play.values.score)).font(.title3.weight(.semibold).monospacedDigit()); Spacer(); Text(DisplayFormat.clear(play.values.playClear)).font(.caption).foregroundStyle(.secondary) }
                         HStack { Text(model.sourceLabel(play)); if play.isOverridden { Label("Edited", systemImage: "pencil").foregroundStyle(.orange) } }.font(.caption).foregroundStyle(.secondary)
                         Text(DisplayFormat.date(play.values.playedAt)).font(.subheadline).foregroundStyle(.secondary)
+                        if play.original.source == .consultantSheet {
+                            Text("Imported \(play.original.firstSeenAt.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(.secondary)
+                        }
                         if let timestamp = play.values.playedAt { Text(timestamp.origin == .manual ? "Manually recorded date" : "Server-provided date").font(.caption2).foregroundStyle(.secondary) }
                         if let modifier = play.values.modifier { Text("Gauge modifier: \(modifier)").font(.caption).foregroundStyle(.secondary) }
                         if let health = play.values.health { Text("Health: \(health)").font(.caption).foregroundStyle(.secondary) }
@@ -40,14 +43,14 @@ struct ScoreDetailView: View {
                     }.padding(.vertical, 8).accessibilityIdentifier("play-\(play.original.id.rawValue)")
                 }
             }
-            Section { Text("Edits are local to your archive. Official potential history keeps its original values.").font(.footnote).foregroundStyle(.secondary) }
+            Section { Text("Edits stay on this device. A main-account import replaces them for the charts it returns.").font(.footnote).foregroundStyle(.secondary) }
         }
         .navigationTitle(model.title(chart)).navigationBarTitleDisplayMode(.inline)
         .toolbar { Button("Add play", systemImage: "plus") { editor = .addForChart(chart) } }
         .sheet(item: $editor) { ScoreEditorView(destination: $0) }
         .confirmationDialog("Delete this saved play?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
             Button("Delete play", role: .destructive) { if let deleting { model.perform { try model.delete(deleting) } }; deleting = nil }
-        } message: { Text("You can undo this change. The same imported record stays hidden after future imports.") }
+        } message: { Text("You can undo this right after.") }
     }
     private func judgment(_ title: String, _ value: Int?, _ color: Color) -> some View { VStack(alignment: .leading, spacing: 3) { Text(title).font(.caption2.bold()).foregroundStyle(color); Text(value.map(String.init) ?? "—").font(.headline.monospacedDigit()) }.frame(maxWidth: .infinity, alignment: .leading) }
 }

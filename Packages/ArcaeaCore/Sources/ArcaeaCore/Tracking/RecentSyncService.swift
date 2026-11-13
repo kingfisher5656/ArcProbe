@@ -1,5 +1,6 @@
 import Foundation
 
+/// Reads the tracked account's most recent play and saves it, one bounded request at a time.
 public actor RecentSyncService {
     private let client: ArcaeaWebClient
     private let archive: ArchiveStore
@@ -9,7 +10,22 @@ public actor RecentSyncService {
         self.client = client; self.archive = archive; self.tracking = tracking; self.deadline = min(20, max(0.01, deadline))
     }
 
-    public func fetch(generation: UUID? = nil, now: Date = Date(), finalFetch: Bool = false) async -> FetchResult {
+    /// One step of the Shortcut loop: fetch when due, then say how long to wait or that the loop is over.
+    /// Whatever was fetched is saved even if this loop has meanwhile been superseded.
+    public func poll(session: UUID, now: Date = Date()) async -> PollDecision {
+        do {
+            let decision = try tracking.beginPoll(session: session, now: now)
+            guard decision == .fetch else { return decision }
+            let started = Date()
+            let result = await fetch(now: now)
+            return try tracking.completePoll(session: session, status: result.status, now: now.addingTimeInterval(Date().timeIntervalSince(started)))
+        } catch {
+            // The state database is briefly unavailable; keep the loop alive and try again shortly.
+            return .wait(seconds: 30)
+        }
+    }
+
+    public func fetch(now: Date = Date()) async -> FetchResult {
         var lease: FetchLease?
         do {
             try Task.checkCancellation()
@@ -17,7 +33,7 @@ public actor RecentSyncService {
                 return result(.authenticationRequired)
             }
             if session.requiresAttention { return result(.attentionRequired) }
-            let acquired = try tracking.acquire(generation: generation, now: now, deadline: deadline, finalFetch: finalFetch)
+            let acquired = try tracking.acquire(now: now, deadline: deadline)
             lease = acquired
             let start = Date()
             let collected = try await withDeadline { try await self.collect(session: session, configuration: configuration, now: now) }
@@ -35,38 +51,57 @@ public actor RecentSyncService {
         } catch {
             let failure = error as? OperationFailure
             let underlying = failure?.error ?? error
-            let status = classify(underlying)
+            var status = classify(underlying)
             var cooldown: Date?
             if case let OnlineError.rateLimited(until) = underlying { cooldown = until }
-            if let lease { try? tracking.finish(lease: lease, status: status, now: now, cooldownUntil: cooldown) }
-            if [.attentionRequired, .authenticationRequired, .wrongAccount, .unsupportedSchema].contains(status) {
-                if let revision = failure?.revision { await latchAttention(expectedRevision: revision) }
+            if status.needsAttention {
+                // A rejected sign-in or an expired session is definite. A single odd answer to a
+                // normal read (gateway error page, brief challenge) is not: retry it a few times first.
+                let definite = failure?.duringLogin == true || status == .authenticationRequired
+                let earlier = (try? tracking.status().consecutiveFailures) ?? 0
+                if definite || earlier + 1 >= TrackingPolicy.failuresBeforeAttention {
+                    if let lease { try? tracking.finish(lease: lease, status: status, now: now) }
+                    if let revision = failure?.revision { await latchAttention(expectedRevision: revision) }
+                } else {
+                    status = .failed
+                    if let lease { try? tracking.finish(lease: lease, status: status, now: now) }
+                }
+            } else if let lease {
+                try? tracking.finish(lease: lease, status: status, now: now, cooldownUntil: cooldown)
             }
             return result(status)
         }
     }
 
     private struct Collected: Sendable { let payload: RecentPayload; let revision: UUID }
-    private struct OperationFailure: Error { let error: Error; let revision: UUID }
+    private struct OperationFailure: Error { let error: Error; let revision: UUID; let duringLogin: Bool }
     private func collect(session: AccountSession, configuration: RecentConfiguration, now: Date) async throws -> Collected {
-        var refreshed = false
         var revision = session.revision
+        var loggingIn = false
         do {
+            var refreshed = false
             if !session.cookies.hasUsableCookies(now: now) {
                 guard let credentials = session.credentials else { throw OnlineError.expiredSession }
-                revision = UUID()
-                _ = try await client.login(role: .burner, credentials: credentials, expected: configuration.observer, now: now, replacementRevision: revision, expectation: .revision(session.revision), reuseRoleCookies: true)
-                refreshed = true
+                revision = UUID(); loggingIn = true
+                try await renew(credentials, session: session, configuration: configuration, now: now, revision: revision)
+                loggingIn = false; refreshed = true
             }
             do {
                 return Collected(payload: try await client.recent(configuration: configuration, now: now, expectedRevision: revision), revision: revision)
             } catch OnlineError.expiredSession where !refreshed {
+                // Without a saved password the session keeps its revision, so the caller can mark it.
                 guard let credentials = session.credentials else { throw OnlineError.expiredSession }
-                revision = UUID()
-                _ = try await client.login(role: .burner, credentials: credentials, expected: configuration.observer, now: now, replacementRevision: revision, expectation: .revision(session.revision), reuseRoleCookies: true)
+                revision = UUID(); loggingIn = true
+                try await renew(credentials, session: session, configuration: configuration, now: now, revision: revision)
+                loggingIn = false
                 return Collected(payload: try await client.recent(configuration: configuration, now: now, expectedRevision: revision), revision: revision)
             }
-        } catch { throw OperationFailure(error: error, revision: revision) }
+        } catch { throw OperationFailure(error: error, revision: revision, duringLogin: loggingIn) }
+    }
+
+    /// One sign-in with the saved password. Never repeated within a request.
+    private func renew(_ credentials: LoginCredentials, session: AccountSession, configuration: RecentConfiguration, now: Date, revision: UUID) async throws {
+        _ = try await client.login(role: .burner, credentials: credentials, expected: configuration.observer, now: now, replacementRevision: revision, expectation: .revision(session.revision), reuseRoleCookies: true)
     }
 
     private func withDeadline<T: Sendable>(_ operation: @escaping @Sendable () async throws -> T) async throws -> T {
@@ -91,15 +126,13 @@ public actor RecentSyncService {
     private func result(_ status: FetchStatus, added: Int = 0) -> FetchResult {
         let state = try? tracking.status()
         return FetchResult(status: status, addedCount: added, lastPlayAt: state?.lastPlayAt,
-                           lastSuccessAt: state?.lastSuccessAt, nextEligibleAt: state?.nextEligibleAt)
+                           lastSuccessAt: state?.lastSuccessAt, nextEligibleAt: state?.cooldownUntil)
     }
 
     private func classify(_ error: Error) -> FetchStatus {
         switch error {
         case TrackingError.alreadyFetching: .alreadyFetching
         case TrackingError.cooldown: .cooldown
-        case TrackingError.trackingStopped: .trackingStopped
-        case TrackingError.staleGeneration: .staleGeneration
         case TrackingError.expiredLease: .deadlineExceeded
         case OnlineError.expiredSession: .authenticationRequired
         case OnlineError.credentialsRejected, OnlineError.interactionRequired: .attentionRequired

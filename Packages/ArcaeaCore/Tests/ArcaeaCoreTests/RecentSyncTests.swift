@@ -19,8 +19,8 @@ import XCTest
     func testHealthyOwnRecentUsesOneReadNoLoginAndDuplicatePollsDeduplicate() async throws {
         let (service, transport, archive, _, _) = try await makeService([jsonResponse(accountJSON), jsonResponse(accountJSON)])
         let now = Date(timeIntervalSince1970: 1_700_000_010)
-        let first = await service.fetch(generation: nil, now: now)
-        let second = await service.fetch(generation: nil, now: now.addingTimeInterval(70))
+        let first = await service.fetch(now: now)
+        let second = await service.fetch(now: now.addingTimeInterval(70))
         XCTAssertEqual(first.status, .success)
         XCTAssertEqual(second.status, .unchanged)
         XCTAssertEqual(try archive.sourceObservations(accountID: AccountID("online:7")).count, 1)
@@ -29,69 +29,155 @@ import XCTest
         XCTAssertEqual(paths, ["/webapi/user/me", "/webapi/user/me"])
     }
 
-    func testClosingCatchUpWaitsForCooldownThenImportsDelayedLastPlay() async throws {
-        let delayed = accountJSON.replacingOccurrences(of: "9800000", with: "9900000")
+    func testPollFetchesWhenDueThenWaitsAndDeduplicates() async throws {
+        let newer = accountJSON.replacingOccurrences(of: "9800000", with: "9900000")
             .replacingOccurrences(of: "1700000000123", with: "1700000040123")
-        let (service, _, archive, tracking, _) = try await makeService([
-            jsonResponse(accountJSON), jsonResponse(accountJSON), jsonResponse(delayed)
-        ])
+        let (service, transport, archive, tracking, _) = try await makeService([jsonResponse(accountJSON), jsonResponse(newer)])
+        try tracking.bind(configuration: RecentConfiguration(observer: AccountID("online:7"), target: AccountID("online:7"), mode: .ownAccountTesting))
         let now = Date(timeIntervalSince1970: 1_700_000_010)
-        let generation = try tracking.start()
-        _ = await service.fetch(generation: generation, now: now)
-        try tracking.stop()
-        let early = await service.fetch(generation: generation, now: now.addingTimeInterval(10), finalFetch: true)
-        XCTAssertEqual(early.status, .cooldown)
-        let first = await service.fetch(generation: generation, now: now.addingTimeInterval(65), finalFetch: true)
-        XCTAssertEqual(first.status, .unchanged)
-        let last = await service.fetch(generation: generation, now: now.addingTimeInterval(130), finalFetch: true)
-        XCTAssertEqual(last.status, .success)
+        let session = try tracking.start(now: now)
+        guard case .wait(let seconds) = await service.poll(session: session, now: now) else { return XCTFail("First poll fetches, then waits") }
+        XCTAssertTrue((65...81).contains(seconds))
+        // A duplicate or early call must not reach the server.
+        let early = await service.poll(session: session, now: now.addingTimeInterval(10))
+        guard case .wait(let remaining) = early else { return XCTFail("Early poll waits") }
+        XCTAssertLessThanOrEqual(remaining, seconds - 9)
+        var paths = await transport.paths()
+        XCTAssertEqual(paths.count, 1)
+        guard case .wait = await service.poll(session: session, now: now.addingTimeInterval(Double(seconds))) else { return XCTFail("Due poll fetches") }
+        paths = await transport.paths()
+        XCTAssertEqual(paths.count, 2)
         XCTAssertEqual(try archive.sourceObservations(accountID: AccountID("online:7")).count, 2)
-        XCTAssertFalse(try tracking.status().isActive)
     }
 
-    func testFinalFetchPreservesServerBackoffAndRejectsActiveOrMissingGeneration() async throws {
-        let (service, _, _, tracking, _) = try await makeService([jsonResponse("{}", status: 429, headers: ["Retry-After": "180"])])
+    func testReopeningQuicklyKeepsScheduleAndRetiresOldLoop() async throws {
+        let (service, transport, _, tracking, _) = try await makeService([jsonResponse(accountJSON), jsonResponse(accountJSON)])
+        try tracking.bind(configuration: RecentConfiguration(observer: AccountID("online:7"), target: AccountID("online:7"), mode: .ownAccountTesting))
         let now = Date(timeIntervalSince1970: 1_700_000_010)
-        let generation = try tracking.start()
-        let active = await service.fetch(generation: generation, now: now, finalFetch: true)
-        XCTAssertEqual(active.status, .staleGeneration)
+        let first = try tracking.start(now: now)
+        guard case .wait(let seconds) = await service.poll(session: first, now: now) else { return XCTFail("First poll fetches") }
+        // Close and reopen three times within a few seconds.
+        var latest = first
+        for offset in [20.0, 24, 28] {
+            try tracking.stop(now: now.addingTimeInterval(offset))
+            latest = try tracking.start(now: now.addingTimeInterval(offset + 1))
+            // Each new loop is told to wait for the schedule already running, not a fresh interval.
+            guard case .wait(let remaining) = await service.poll(session: latest, now: now.addingTimeInterval(offset + 1)) else { return XCTFail("New loop waits") }
+            XCTAssertEqual(remaining, seconds - Int(offset + 1))
+        }
+        let stale = await service.poll(session: first, now: now.addingTimeInterval(Double(seconds)))
+        XCTAssertEqual(stale, .stop(.superseded))
+        guard case .wait = await service.poll(session: latest, now: now.addingTimeInterval(Double(seconds))) else { return XCTFail("Newest loop fetches on schedule") }
+        let paths = await transport.paths()
+        XCTAssertEqual(paths.count, 2)
+    }
+
+    func testClosingRunsTwoChecksThenEndsLoopAndCatchesLatePlay() async throws {
+        let delayed = accountJSON.replacingOccurrences(of: "9800000", with: "9900000")
+            .replacingOccurrences(of: "1700000000123", with: "1700000040123")
+        let (service, _, archive, tracking, _) = try await makeService([jsonResponse(accountJSON), jsonResponse(accountJSON), jsonResponse(delayed)])
+        try tracking.bind(configuration: RecentConfiguration(observer: AccountID("online:7"), target: AccountID("online:7"), mode: .ownAccountTesting))
+        let now = Date(timeIntervalSince1970: 1_700_000_010)
+        let session = try tracking.start(now: now)
+        guard case .wait(let seconds) = await service.poll(session: session, now: now) else { return XCTFail("First poll fetches") }
+        try tracking.stop(now: now.addingTimeInterval(30))
+        // A repeated close event must not restart the countdown.
+        try tracking.stop(now: now.addingTimeInterval(31))
+        let firstClosing = now.addingTimeInterval(Double(seconds))
+        guard case .wait(let closingWait) = await service.poll(session: session, now: firstClosing) else { return XCTFail("First closing check continues") }
+        XCTAssertEqual(closingWait, Int(TrackingPolicy.closingInterval))
+        let last = await service.poll(session: session, now: firstClosing.addingTimeInterval(Double(closingWait)))
+        XCTAssertEqual(last, .stop(.finished))
+        XCTAssertEqual(try archive.sourceObservations(accountID: AccountID("online:7")).count, 2)
+        let after = await service.poll(session: session, now: firstClosing.addingTimeInterval(200))
+        XCTAssertEqual(after, .stop(.finished))
+    }
+
+    func testSupersededLoopStillSavesItsInFlightResult() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let archive = try ArchiveStore(url: folder.appendingPathComponent("archive.sqlite"))
+        let tracking = try TrackingStore(url: folder.appendingPathComponent("tracking.sqlite"))
+        let sessions = TestSessionStore()
+        let config = RecentConfiguration(observer: AccountID("online:7"), target: AccountID("online:7"), mode: .ownAccountTesting)
+        await sessions.save(AccountSession(cookies: testJar(), boundAccount: config.observer, recentConfiguration: config), role: .burner)
+        try tracking.bind(configuration: config)
+        let transport = SuspendedTransport()
+        let service = RecentSyncService(client: ArcaeaWebClient(transport: transport, sessions: sessions), archive: archive, tracking: tracking)
+        let old = try tracking.start()
+        let task = Task { await service.poll(session: old) }
+        await transport.waitForRequest()
         try tracking.stop()
-        let missing = await service.fetch(now: now, finalFetch: true)
-        XCTAssertEqual(missing.status, .staleGeneration)
-        let limited = await service.fetch(generation: generation, now: now, finalFetch: true)
-        XCTAssertEqual(limited.status, .rateLimited)
-        let retry = await service.fetch(generation: generation, now: now.addingTimeInterval(65), finalFetch: true)
-        XCTAssertEqual(retry.status, .cooldown)
-        XCTAssertEqual(retry.nextEligibleAt, now.addingTimeInterval(180))
-        _ = try tracking.start()
-        let stale = await service.fetch(generation: generation, now: now.addingTimeInterval(200), finalFetch: true)
-        XCTAssertEqual(stale.status, .staleGeneration)
+        let replacement = try tracking.start()
+        await transport.resume(jsonResponse(accountJSON))
+        let decision = await task.value
+        XCTAssertEqual(decision, .stop(.superseded))
+        // The play is real regardless of which loop asked for it.
+        XCTAssertEqual(try archive.sourceObservations(accountID: AccountID("online:7")).count, 1)
+        XCTAssertEqual(try tracking.status().session, replacement)
+        XCTAssertTrue(try tracking.status().isActive)
+    }
+
+    func testRateLimitDelaysNextPollUntilServerAllows() async throws {
+        let (service, _, _, tracking, _) = try await makeService([jsonResponse("{}", status: 429, headers: ["Retry-After": "180"])])
+        try tracking.bind(configuration: RecentConfiguration(observer: AccountID("online:7"), target: AccountID("online:7"), mode: .ownAccountTesting))
+        let now = Date(timeIntervalSince1970: 1_700_000_010)
+        let session = try tracking.start(now: now)
+        let decision = await service.poll(session: session, now: now)
+        XCTAssertEqual(decision, .wait(seconds: 180))
+        let manual = await service.fetch(now: now.addingTimeInterval(65))
+        XCTAssertEqual(manual.status, .cooldown)
+        XCTAssertEqual(manual.nextEligibleAt, now.addingTimeInterval(180))
     }
 
     func testExpiredSessionRefreshesOnceAndRetryNeverRefreshesAgain() async throws {
         let (service, transport, archive, _, _) = try await makeService([
             jsonResponse("{}", status: 401), jsonResponse(#"{"value":{}}"#), jsonResponse(accountJSON), jsonResponse("{}", status: 401)
         ])
-        let result = await service.fetch(generation: nil)
+        let result = await service.fetch()
         XCTAssertEqual(result.status, .authenticationRequired)
         let paths = await transport.paths()
         XCTAssertEqual(paths.filter { $0 == "/auth/login" }.count, 1)
         XCTAssertEqual(try archive.sourceObservations(accountID: AccountID("online:7")).count, 0)
     }
 
-    func testJSONChallengeLatchesAttentionAnd429PersistsCooldown() async throws {
-        let (challenge, transport, _, _, _) = try await makeService([jsonResponse(#"{"error_code":1010}"#, status: 403)])
-        let firstChallenge = await challenge.fetch(generation: nil)
-        XCTAssertEqual(firstChallenge.status, .attentionRequired)
-        let secondChallenge = await challenge.fetch(generation: nil, now: Date().addingTimeInterval(70))
-        XCTAssertEqual(secondChallenge.status, .attentionRequired)
-        let paths = await transport.paths()
-        XCTAssertEqual(paths, ["/webapi/user/me"])
+    func testSingleChallengeIsRetriedButRepeatedChallengeLatchesAttention() async throws {
+        let challenge = jsonResponse(#"{"error_code":1010}"#, status: 403)
+        let (service, transport, archive, tracking, sessions) = try await makeService([challenge, jsonResponse(accountJSON), challenge, challenge, challenge])
+        try tracking.bind(configuration: RecentConfiguration(observer: AccountID("online:7"), target: AccountID("online:7"), mode: .ownAccountTesting))
+        var now = Date(timeIntervalSince1970: 1_700_000_010)
+        let session = try tracking.start(now: now)
+        // One odd answer only slows the loop down.
+        guard case .wait = await service.poll(session: session, now: now) else { return XCTFail("A single challenge must not end tracking") }
+        XCTAssertEqual(try tracking.status().lastStatus, .failed)
+        var latched = await sessions.load(role: .burner)?.requiresAttention
+        XCTAssertEqual(latched, false)
+        now = try XCTUnwrap(tracking.status().nextPollAt)
+        guard case .wait = await service.poll(session: session, now: now) else { return XCTFail("Recovered poll continues") }
+        XCTAssertEqual(try archive.sourceObservations(accountID: AccountID("online:7")).count, 1)
+        XCTAssertEqual(try tracking.status().consecutiveFailures, 0)
+        // Three in a row is a real problem: stop and ask the user.
+        var decision = PollDecision.fetch
+        for _ in 0..<3 {
+            now = try XCTUnwrap(tracking.status().nextPollAt)
+            decision = await service.poll(session: session, now: now)
+        }
+        XCTAssertEqual(decision, .stop(.needsAttention))
+        latched = await sessions.load(role: .burner)?.requiresAttention
+        XCTAssertEqual(latched, true)
+        XCTAssertFalse(try tracking.status().isActive)
+        let requests = await transport.paths().count
+        let blocked = await service.fetch(now: now.addingTimeInterval(600))
+        XCTAssertEqual(blocked.status, .attentionRequired)
+        let afterwards = await transport.paths().count
+        XCTAssertEqual(requests, afterwards)
+    }
+
+    func testRateLimitPersistsCooldown() async throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let (limited, _, _, tracking, _) = try await makeService([jsonResponse("{}", status: 429, headers: ["Retry-After": "180"])])
-        let result = await limited.fetch(generation: nil, now: now)
+        let result = await limited.fetch(now: now)
         XCTAssertEqual(result.status, .rateLimited)
-        XCTAssertEqual(try tracking.status().nextEligibleAt, now.addingTimeInterval(180))
+        XCTAssertEqual(try tracking.status().cooldownUntil, now.addingTimeInterval(180))
     }
 }
 
@@ -114,34 +200,6 @@ actor CancellableTransport: HTTPTransport {
         await sessions.save(session(), role: .burner)
         return (RecentSyncService(client: ArcaeaWebClient(transport: transport, sessions: sessions), archive: archive, tracking: tracking, deadline: deadline), sessions, archive, tracking)
     }
-    func testStoppedGenerationDoesNotCommitFetchedPlay() async throws {
-        let transport = SuspendedTransport()
-        let (service, _, archive, tracking) = try await make(transport: transport)
-        let generation = try tracking.start()
-        let task = Task { await service.fetch(generation: generation) }
-        await transport.waitForRequest()
-        try tracking.stop()
-        await transport.resume(jsonResponse(#"{"value":{"user_id":7,"recent_score":[{"song_id":"test","difficulty":2,"score":9800000}]}}"#))
-        let result = await task.value
-        XCTAssertEqual(result.status, .trackingStopped)
-        XCTAssertTrue(try archive.sourceObservations(accountID: AccountID("online:7")).isEmpty)
-    }
-    func testReopenDuringFinalFetchRejectsOldCommit() async throws {
-        let transport = SuspendedTransport()
-        let (service, _, archive, tracking) = try await make(transport: transport)
-        let generation = try tracking.start()
-        try tracking.stop()
-        let task = Task { await service.fetch(generation: generation, finalFetch: true) }
-        await transport.waitForRequest()
-        let replacement = try tracking.start()
-        await transport.resume(jsonResponse(#"{"value":{"user_id":7,"recent_score":[{"song_id":"test","difficulty":2,"score":9900000}]}}"#))
-        let result = await task.value
-        XCTAssertEqual(result.status, .staleGeneration)
-        XCTAssertTrue(try archive.sourceObservations(accountID: AccountID("online:7")).isEmpty)
-        XCTAssertEqual(try tracking.status().generation, replacement)
-        XCTAssertTrue(try tracking.status().isActive)
-    }
-
     func testOldChallengeCannotLatchReplacementRole() async throws {
         let transport = SuspendedTransport()
         let (service, sessions, _, _) = try await make(transport: transport)
@@ -161,7 +219,7 @@ actor CancellableTransport: HTTPTransport {
         let result = await service.fetch()
         XCTAssertEqual(result.status, .deadlineExceeded)
         XCTAssertTrue(try archive.profiles().isEmpty)
-        XCTAssertNotNil(try tracking.status().nextEligibleAt)
+        XCTAssertNotNil(try tracking.status().cooldownUntil)
     }
     func testFriendModeUsesRecentCookiesAndFiltersTargetWithoutSubscription() async throws {
         let responses = [jsonResponse(#"{"value":{"user_id":8,"arcaea_online_expire_ts":0}}"#), jsonResponse(#"{"value":{"friends":[{"user_id":9,"recent_score":[{"song_id":"other","difficulty":2,"score":9900000}]},{"user_id":7,"recent_score":[{"song_id":"target","difficulty":2,"score":9700000}]}]}}"#)]

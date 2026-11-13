@@ -16,7 +16,7 @@ final class ReconciliationTests: XCTestCase {
         XCTAssertEqual(try restored.sourceObservations(accountID: testAccount).count, 2)
     }
 
-    func testEventIDIntroducedByAnotherRouteKeepsCorrectionAndSuppression() throws {
+    func testEventIDIntroducedByFullSyncResetsCorrectionAndSuppression() throws {
         let store = try ArchiveStore(url: temporaryArchiveURL())
         let values = ScoreValues(score: 9_800_000, playedAt: SourceTimestamp(value: 1_800_000_000, unit: .seconds))
         let recent = try ScoreObservation.remote(accountID: testAccount, chartID: testChart, source: .officialRecent,
@@ -28,15 +28,15 @@ final class ReconciliationTests: XCTestCase {
         let receipt = try store.apply(batch: ImportBatch(profile: AccountProfile(id: testAccount), observations: [imported]))
         XCTAssertEqual(receipt.addedCount, 0)
         XCTAssertEqual(receipt.duplicateCount, 1)
-        XCTAssertEqual(try store.bestScores(accountID: testAccount).first?.values.score, 9_500_000)
+        XCTAssertEqual(try store.bestScores(accountID: testAccount).first?.values.score, 9_800_000)
         _ = try store.applyManual(change: .suppress(accountID: testAccount, observationID: recent.id))
         _ = try store.apply(batch: ImportBatch(profile: AccountProfile(id: testAccount), observations: [imported]))
-        XCTAssertTrue(try store.bestScores(accountID: testAccount).isEmpty)
+        XCTAssertEqual(try store.bestScores(accountID: testAccount).first?.values.score, 9_800_000)
         let roundTrip = try ArchiveStore(url: temporaryArchiveURL())
         _ = try ArchiveBackup(store: roundTrip).validateAndRestore(data: ArchiveBackup(store: store).export())
         let repeated = try roundTrip.apply(batch: ImportBatch(profile: AccountProfile(id: testAccount), observations: [imported]))
         XCTAssertEqual(repeated.addedCount, 0)
-        XCTAssertTrue(try roundTrip.bestScores(accountID: testAccount).isEmpty)
+        XCTAssertEqual(try roundTrip.bestScores(accountID: testAccount).first?.values.score, 9_800_000)
     }
 
     func testDifferentVerifiedEventIDsRemainDistinctEvenWithEqualTimestampAndScore() throws {
@@ -49,7 +49,7 @@ final class ReconciliationTests: XCTestCase {
         XCTAssertEqual(try store.sourceObservations(accountID: testAccount).count, 2)
     }
 
-    func testSamePlayAcrossSourcesEnrichesCoherentlyAndDoesNotBypassSuppression() throws {
+    func testSamePlayAcrossSourcesEnrichesCoherentlyAndFullSyncRestoresSuppressedScore() throws {
         let store = try ArchiveStore(url: temporaryArchiveURL())
         let recent = try ScoreObservation.remote(accountID: testAccount, chartID: testChart, source: .officialRecent,
             values: ScoreValues(score: 9_800_000, playedAt: SourceTimestamp(value: 1_800_000_000, unit: .seconds),
@@ -71,7 +71,7 @@ final class ReconciliationTests: XCTestCase {
         XCTAssertEqual(try store.sourceObservations(accountID: testAccount).first?.values, recent.values)
         _ = try store.applyManual(change: .suppress(accountID: testAccount, observationID: recent.id))
         _ = try store.apply(batch: ImportBatch(profile: AccountProfile(id: testAccount), observations: [imported]))
-        XCTAssertTrue(try store.bestScores(accountID: testAccount).isEmpty)
+        XCTAssertEqual(try store.bestScores(accountID: testAccount).first?.values.score, 9_800_000)
     }
 
     func testIncomingPartialMetadataPreservesExistingRatingAndNoteBounds() throws {

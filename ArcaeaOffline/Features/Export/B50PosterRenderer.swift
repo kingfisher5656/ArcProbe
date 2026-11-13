@@ -43,7 +43,7 @@ import CoreText
         case .fullRecall: "F"
         case .pureMemory: "P"
         case .trackLost: "L"
-        case nil: "?"
+        case nil: "C"
         }
     }
     private static func background(_ cg: CGContext) {
@@ -168,7 +168,7 @@ import CoreText
         case .fullRecall: color(0xb356a5)
         case .pureMemory: color(0x80cce0)
         case .trackLost: color(0x626271)
-        case nil: color(0x706579)
+        case nil: color(0x304c86)
         }
         diamond(center: CGPoint(x: 274, y: 187), radius: 31, colors: [clearColor, color(0x17182c)], cg: cg)
         badgeText(clearSymbol(clear), center: CGPoint(x: 274, y: 187), radius: 31, size: 44, color: .white, weight: .ultraLight, outline: true, cg: cg)

@@ -22,7 +22,8 @@ internal struct ArchivePayload: Codable {
 }
 
 public struct ArchiveBackup: Sendable {
-    public static let schemaVersion = 1
+    public static let schemaVersion = 2
+    private static let supportedVersions = 1...schemaVersion
     public let store: ArchiveStore
     public init(store: ArchiveStore) { self.store = store }
     public func export() throws -> Data {
@@ -61,7 +62,7 @@ public struct ArchiveBackup: Sendable {
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], let version = object["schemaVersion"] as? Int else {
             throw ArchiveError.invalidRecord("Backup has no schema version")
         }
-        guard version == Self.schemaVersion else { throw ArchiveError.unsupportedVersion(version) }
+        guard Self.supportedVersions.contains(version) else { throw ArchiveError.unsupportedVersion(version) }
         let payload = try JSONDecoder().decode(ArchivePayload.self, from: data)
         try validate(payload)
         try cancellationCheck()
@@ -112,7 +113,7 @@ public struct ArchiveBackup: Sendable {
     private static let maximumBytes = 64 * 1_024 * 1_024
 
     private func validate(_ payload: ArchivePayload) throws {
-        guard payload.schemaVersion == Self.schemaVersion else { throw ArchiveError.unsupportedVersion(payload.schemaVersion) }
+        guard Self.supportedVersions.contains(payload.schemaVersion) else { throw ArchiveError.unsupportedVersion(payload.schemaVersion) }
         try ArchiveValidation.date(payload.createdAt)
         let counts = [payload.profiles.count, payload.charts.count, payload.observations.count,
                       payload.captures.count, payload.aliases.count, payload.overrides.count, payload.suppressions.count,

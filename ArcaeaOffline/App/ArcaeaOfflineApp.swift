@@ -4,27 +4,27 @@ import SwiftUI
 @main
 struct ArcaeaOfflineApp: App {
     @Environment(\.scenePhase) private var scenePhase
-    @State private var model: ArchiveModel?
-    @State private var runtime: OnlineRuntime?
+    @State private var container: AppContainer?
     @State private var startupError: String?
     var body: some Scene {
         WindowGroup {
             Group {
-                if let model, let runtime { RootView().environment(model).environment(runtime) }
+                if let container { RootView().environment(container.model).environment(container.runtime) }
                 else if let startupError { ContentUnavailableView("Archive unavailable", systemImage: "externaldrive.badge.exclamationmark", description: Text(startupError)) }
                 else { ProgressView("Opening archive…") }
             }
+            .onOpenURL { url in ConsultantProbeModel.shared.auth.resume(url) }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active { model?.perform { try model?.reload() }; Task { await runtime?.refreshStatus() } }
+                guard phase == .active, let container else { return }
+                container.model.perform { try container.model.reload() }
+                Task { await container.runtime.refreshStatus() }
             }
             .task {
-                guard model == nil else { return }
+                guard container == nil else { return }
                 do {
-                    let catalog = try ChartCatalog.bundled()
-                    let store = try ArchiveStore(url: ArchiveLocation.url(), catalog: catalog)
-                    model = try ArchiveModel(store: store, catalog: catalog)
-                    runtime = try OnlineRuntime(store: store, directory: ArchiveLocation.directory())
-                    await runtime?.refreshStatus()
+                    let shared = try AppContainer.shared()
+                    container = shared
+                    await shared.runtime.refreshStatus()
                 } catch { startupError = error.localizedDescription }
             }
         }

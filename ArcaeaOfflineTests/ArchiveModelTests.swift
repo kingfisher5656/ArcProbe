@@ -85,6 +85,46 @@ final class ArchiveModelTests: XCTestCase {
         XCTAssertEqual(restored.potentialSyncDate, date)
     }
 
+    func testSheetOnlyGraphAndB50RefreshThenYieldToOfficialSync() throws {
+        let model = try makeModel()
+        let account = AccountID("local")
+        let importedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let sheet = ScoreObservation(id: ObservationID("sheet-only"), accountID: account, chartID: chart,
+            source: .consultantSheet, values: ScoreValues(score: 10000000), firstSeenAt: importedAt)
+        _ = try model.store.apply(batch: ImportBatch(profile: AccountProfile(id: account), observations: [sheet], importedAt: importedAt, kind: .consultantSheet))
+        try model.reload()
+        XCTAssertEqual(model.localHistory.first?.timestamp.date, importedAt)
+        XCTAssertNil(model.potentialSyncDate)
+        XCTAssertNil(model.bestScores.first?.bestClear)
+        XCTAssertEqual(model.ranking?.rows.first?.ratingUnits, 7320000)
+        let sync = importedAt.addingTimeInterval(100)
+        let official = ScoreObservation(id: ObservationID("official-lower"), accountID: account, chartID: chart,
+            source: .officialImport, values: ScoreValues(score: 9800000, bestClear: .normal), firstSeenAt: sync)
+        let point = PotentialPoint(accountID: account, sourceID: "official", timestamp: SourceTimestamp(value: 1700000100, unit: .seconds), value: PotentialValue(rawValue: 12000, decimalPlaces: 3), firstSeenAt: sync)
+        _ = try model.store.apply(batch: ImportBatch(profile: AccountProfile(id: account), observations: [official], potentialPoints: [point], importedAt: sync, kind: .full))
+        try model.reload()
+        XCTAssertEqual(model.bestScores.first?.values.score, 9800000)
+        XCTAssertEqual(model.officialHistory, [point])
+        XCTAssertTrue(model.localHistory.isEmpty)
+        XCTAssertEqual(model.potentialSyncDate, sync)
+        XCTAssertEqual(model.observations.map(\.original.id), [official.id])
+    }
+
+    func testExistingSheetScoreUsesCanonicalTitleInAppAndExport() throws {
+        let id = ChartID(songID: "mask", difficulty: .future)
+        let store = try ArchiveStore(url: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("archive.sqlite"))
+        let score = ScoreObservation(id: ObservationID("sheet-mask"), accountID: AccountID("local"), chartID: id,
+            source: .consultantSheet, values: ScoreValues(score: 9900000), firstSeenAt: Date())
+        _ = try store.apply(batch: ImportBatch(profile: AccountProfile(id: score.accountID), observations: [score],
+            charts: [ChartMetadata(id: id, constant: ChartConstant(tenths: 100), provenance: "old archive")], kind: .consultantSheet))
+        let model = try ArchiveModel(store: store, catalog: store.chartCatalog())
+        XCTAssertEqual(model.title(id), "~_+")
+        XCTAssertEqual(model.ranking?.rows.first?.best.chartID.songID, "mask")
+        let file = try ScoreExportService.csv(model: model)
+        XCTAssertTrue(try String(contentsOf: file.url, encoding: .utf8).contains("~_+"))
+        XCTAssertEqual(model.observations.first?.values.score, 9900000)
+    }
+
     func testInvalidScoreLeavesArchiveUnchanged() throws {
         let model = try makeModel()
         XCTAssertThrowsError(try model.save(ScoreDraft(chartID: chart, score: -1))) { error in

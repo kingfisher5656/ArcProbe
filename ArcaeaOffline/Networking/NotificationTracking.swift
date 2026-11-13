@@ -2,119 +2,96 @@ import ArcaeaCore
 import Foundation
 import UserNotifications
 
+/// Experimental alternative to the Repeat/Wait loop for systems that cut long automations short.
+///
+/// Instead of one Shortcut waiting between checks, each check schedules a silent local
+/// notification, and a Notification automation runs the next check when it arrives.
+/// The timing and stop rules are exactly those of the normal loop (`OnlineRuntime.pollTracking`).
 @MainActor protocol PulseDelivery {
     func authorized() async -> Bool
-    func schedule(_ state: NotificationPulseState) async throws
-    func cancel(token: UUID)
+    func schedule(session: UUID, after seconds: Int) async throws
+    func cancel()
 }
 
 @MainActor final class SystemPulseDelivery: PulseDelivery {
+    /// One fixed identifier: scheduling again replaces the pending pulse, so the chain can never fork.
+    static let identifier = "arcprobe.tracking.pulse"
     private let center = UNUserNotificationCenter.current()
     func authorized() async -> Bool {
         let status = await center.notificationSettings().authorizationStatus
         return status == .authorized || status == .provisional
     }
-    func schedule(_ state: NotificationPulseState) async throws {
-        guard let token = state.token, let generation = state.generation, let date = state.nextAt else { return }
+    func schedule(session: UUID, after seconds: Int) async throws {
         let content = UNMutableNotificationContent()
-        content.title = "ArcProbe tracking pulse"
-        content.subtitle = "Recent play refresh"
-        content.body = "arcprobe:\(generation.uuidString):\(token.uuidString)"
+        content.title = NotificationTracking.title
+        content.body = NotificationTracking.message(session: session)
         content.threadIdentifier = "arcprobe-tracking"
-        // No sound; normal notification delivery remains subject to Focus and system policies.
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, date.timeIntervalSinceNow), repeats: false)
-        try await center.add(UNNotificationRequest(identifier: token.uuidString, content: content, trigger: trigger))
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(max(1, seconds)), repeats: false)
+        try await center.add(UNNotificationRequest(identifier: Self.identifier, content: content, trigger: trigger))
     }
-    func cancel(token: UUID) {
-        center.removePendingNotificationRequests(withIdentifiers: [token.uuidString])
-        center.removeDeliveredNotifications(withIdentifiers: [token.uuidString])
+    func cancel() {
+        center.removePendingNotificationRequests(withIdentifiers: [Self.identifier])
+        center.removeDeliveredNotifications(withIdentifiers: [Self.identifier])
     }
 }
 
 enum NotificationTrackingError: Error, LocalizedError {
-    case permission, unconfigured, invalidToken
+    case permission, invalidMessage
     var errorDescription: String? {
         switch self {
-        case .permission: "Enable notifications in ArcProbe Settings before starting notification tracking."
-        case .unconfigured: "Configure the recent account in ArcProbe before starting notification tracking."
-        case .invalidToken: "Pass the received notification’s Message (body) to Process Tracking Notification."
+        case .permission: "Allow notifications for ArcProbe first: ArcProbe → Settings → Tracking → Notification method."
+        case .invalidMessage: "Pass the received notification’s Message (body) to Process Tracking Notification."
         }
     }
 }
 
 @MainActor final class NotificationTracking {
-    private let store: NotificationPulseStore
+    static let title = "ArcProbe tracking pulse"
+    static let shared = NotificationTracking(delivery: SystemPulseDelivery())
     private let delivery: any PulseDelivery
-    private static var cached: NotificationTracking?
-    init(store: NotificationPulseStore, delivery: any PulseDelivery) { self.store = store; self.delivery = delivery }
-    static func shared() throws -> NotificationTracking {
-        if let cached { return cached }
-        let value = try NotificationTracking(store: NotificationPulseStore(url: ArchiveLocation.directory().appendingPathComponent("notification-pulses.sqlite")), delivery: SystemPulseDelivery())
-        cached = value; return value
+    init(delivery: any PulseDelivery) { self.delivery = delivery }
+
+    static func message(session: UUID) -> String { "arcprobe:\(session.uuidString)" }
+    static func session(from message: String) throws -> UUID {
+        guard let range = message.range(of: #"arcprobe:[A-Fa-f0-9-]{36}"#, options: .regularExpression),
+              let session = UUID(uuidString: String(message[range].dropFirst("arcprobe:".count))) else { throw NotificationTrackingError.invalidMessage }
+        return session
     }
-    func state() throws -> NotificationPulseState { try store.state() }
-    func configure(minimum: Int, maximum: Int) throws { try store.configure(minimum: minimum, maximum: maximum) }
-    @discardableResult func start(runtime: OnlineRuntime, now: Date = Date()) async throws -> NotificationPulseState {
+
+    func authorized() async -> Bool { await delivery.authorized() }
+    func requestPermission() async throws -> Bool {
+        try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert])
+    }
+
+    /// Arcaea opened: start a session, check once, and schedule the first pulse.
+    func start(runtime: OnlineRuntime) async throws {
         guard await delivery.authorized() else { throw NotificationTrackingError.permission }
-        await runtime.refreshStatus()
-        guard runtime.recentConfiguration != nil else { throw NotificationTrackingError.unconfigured }
-        let previous = try store.state()
-        let generation = try runtime.startTracking()
-        let next = try store.start(generation: generation, now: now, randomDelay: delay(previous), notBefore: runtime.status().nextEligibleAt)
-        if let token = previous.token { delivery.cancel(token: token) }
-        do { try await schedule(next) }
-        catch {
-            if try runtime.status().generation == generation { try runtime.stopTracking() }
-            throw error
-        }
-        return try store.state()
+        let session = try await runtime.startTracking()
+        try await step(session: session, runtime: runtime)
     }
-    func stop(runtime: OnlineRuntime) throws {
-        let previous = try store.stop()
-        try runtime.stopTracking()
-        if let token = previous?.token { delivery.cancel(token: token) }
+
+    /// A pulse arrived: run one check and schedule the next pulse. Returns the seconds until it, or 0 when tracking ended.
+    @discardableResult func process(message: String, runtime: OnlineRuntime) async throws -> Int {
+        try await step(session: Self.session(from: message), runtime: runtime)
     }
-    func process(message: String, runtime: OnlineRuntime, now: Date = Date()) async throws -> String {
-        let (generation, token) = try Self.parse(message)
-        let tracking = try runtime.status()
-        guard tracking.isActive, tracking.generation == generation else {
-            if let old = try store.stop(expectedToken: token)?.token { delivery.cancel(token: old) }
-            return try shortcutJSON(ShortcutFetchOutput(FetchResult(status: .staleGeneration)))
+
+    @discardableResult private func step(session: UUID, runtime: OnlineRuntime) async throws -> Int {
+        switch await runtime.pollTracking(session: session) {
+        case .wait(let seconds):
+            try await delivery.schedule(session: session, after: seconds)
+            return seconds
+        case .fetch:
+            try await delivery.schedule(session: session, after: 5)
+            return 5
+        case .stop(.superseded):
+            // A newer session owns the pending pulse; leave it alone.
+            return 0
+        case .stop(.finished):
+            delivery.cancel(); return 0
+        case .stop(.needsAttention):
+            delivery.cancel(); throw TrackingSetupError.needsAttention
+        case .stop(.notConfigured):
+            delivery.cancel(); throw TrackingSetupError.notConfigured
         }
-        let current = try store.state()
-        guard let next = try store.advance(token: token, generation: generation, now: now, randomDelay: delay(current), notBefore: tracking.nextEligibleAt) else {
-            return try shortcutJSON(ShortcutFetchOutput(FetchResult(status: .unchanged)))
-        }
-        delivery.cancel(token: token)
-        // Renew before fetching, so an offline request or action interruption does not inherently end the chain.
-        try await schedule(next)
-        let result = await runtime.fetchRecent(generation: generation)
-        if [.attentionRequired, .authenticationRequired, .wrongAccount, .unsupportedSchema].contains(result.status),
-           let stopped = try store.stop(expectedToken: next.token), let pending = stopped.token {
-            delivery.cancel(token: pending)
-            if try runtime.status().generation == generation { try runtime.stopTracking() }
-        }
-        return try shortcutJSON(ShortcutFetchOutput(result))
-    }
-    private func schedule(_ state: NotificationPulseState) async throws {
-        guard let token = state.token else { return }
-        do {
-            guard await delivery.authorized() else { throw NotificationTrackingError.permission }
-            try await delivery.schedule(state)
-            // Stop/start may run while the system registers the request. Remove only our superseded token.
-            if try store.state().token != token { delivery.cancel(token: token) }
-        } catch {
-            _ = try? store.stop(expectedToken: token)
-            delivery.cancel(token: token)
-            throw error
-        }
-    }
-    private func delay(_ state: NotificationPulseState) -> Int { Int.random(in: state.minimumSeconds...state.maximumSeconds) }
-    static func parse(_ message: String) throws -> (UUID, UUID) {
-        let expression = try NSRegularExpression(pattern: #"arcprobe:([A-Fa-f0-9-]{36}):([A-Fa-f0-9-]{36})"#)
-        guard let match = expression.firstMatch(in: message, range: NSRange(message.startIndex..., in: message)),
-              let a = Range(match.range(at: 1), in: message), let b = Range(match.range(at: 2), in: message),
-              let generation = UUID(uuidString: String(message[a])), let token = UUID(uuidString: String(message[b])) else { throw NotificationTrackingError.invalidToken }
-        return (generation, token)
     }
 }

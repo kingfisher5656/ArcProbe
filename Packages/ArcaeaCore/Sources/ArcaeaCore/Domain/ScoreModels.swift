@@ -83,7 +83,7 @@ public struct ScoreValues: Hashable, Codable, Sendable {
 }
 
 public enum ObservationSource: String, Codable, Sendable {
-    case officialImport, officialRecent, manual
+    case officialImport, officialRecent, manual, consultantSheet
 }
 public enum IdentityConfidence: String, Codable, Sendable {
     case sourceEvent, exactTimestampAndPayload, payloadOnly, manual

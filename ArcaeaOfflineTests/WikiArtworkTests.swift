@@ -1,5 +1,6 @@
 import ArcaeaCore
 import UIKit
+import WebKit
 import XCTest
 @testable import ArcaeaOffline
 
@@ -13,21 +14,64 @@ import XCTest
         try LibraryResources.shared.saveWikiCover(XCTUnwrap(original.pngData()), chart: chart)
         XCTAssertEqual(LibraryResources.shared.image(chart: chart, officialIdentifier: nil)?.cgImage?.width, 500)
     }
+    private func file(_ name: String, _ tab: String) -> WikiJacket {
+        WikiJacket(filePage: "https://arcaea.miraheze.org/wiki/File:" + name, difficulties: tab)
+    }
+    private func chart(_ song: String, _ difficulty: Difficulty) -> ChartID { ChartID(songID: song, difficulty: difficulty) }
     func testBeyondJacketIsNeverUsedForBaseChart() throws {
-        let base = WikiJacket(filePage: "https://arcaea.miraheze.org/wiki/File:Songs_vexaria.jpg", difficulties: "Past/Present/Future")
-        let beyond = WikiJacket(filePage: "https://arcaea.miraheze.org/wiki/File:Songs_vexaria_byd.jpg", difficulties: "Beyond")
-        let article = WikiSongArticle(songID: "vexaria", jackets: [base, beyond, base, beyond])
-        XCTAssertEqual(article.jacket(for: .future), base)
-        XCTAssertEqual(article.jacket(for: .beyond), beyond)
-        XCTAssertNil(article.jacket(for: .eternal))
-        XCTAssertNil(WikiSongArticle(songID: "vexaria", jackets: [base]).jacket(for: .beyond))
+        let base = file("Songs_vexaria.jpg", "Past/Present/Future"), beyond = file("Songs_vexaria_byd.jpg", "Beyond")
+        let article = WikiSongArticle(songIDs: ["vexaria"], jackets: [base, beyond, base, beyond])
+        XCTAssertEqual(article.jacket(for: chart("vexaria", .future)), base)
+        XCTAssertEqual(article.jacket(for: chart("vexaria", .beyond)), beyond)
+        XCTAssertNil(article.jacket(for: chart("vexaria", .eternal)))
+        XCTAssertNil(WikiSongArticle(songIDs: ["vexaria"], jackets: [base]).jacket(for: chart("vexaria", .beyond)))
     }
     func testSingleUnlabelledCoverAndAmbiguousVariants() throws {
         let base = WikiJacket(filePage: "base", difficulties: "")
-        XCTAssertEqual(WikiSongArticle(songID: "testify", jackets: [base, base]).jacket(for: .beyond), base)
+        XCTAssertEqual(WikiSongArticle(songIDs: ["testify"], jackets: [base, base]).jacket(for: chart("testify", .beyond)), base)
         let another = WikiJacket(filePage: "other", difficulties: "Beyond")
         let duplicate = WikiJacket(filePage: "different", difficulties: "Beyond")
-        XCTAssertNil(WikiSongArticle(songID: "x", jackets: [another, duplicate]).jacket(for: .beyond))
+        XCTAssertNil(WikiSongArticle(songIDs: ["x"], jackets: [another, duplicate]).jacket(for: chart("x", .beyond)))
+    }
+    // The three pages that used to be opened on every run because no tab names a difficulty.
+    func testTabsNamedForSomethingOtherThanDifficulty() throws {
+        let base = file("Songs_last.jpg", "Past/Present/Future"), moment = file("Songs_last_byd.jpg", "Moment"), eternity = file("Songs_lasteternity.jpg", "Eternity")
+        let last = WikiSongArticle(songIDs: ["last", "lasteternity"], jackets: [base, moment, eternity, base, moment, eternity])
+        XCTAssertEqual(last.jacket(for: chart("last", .past)), base)
+        XCTAssertEqual(last.jacket(for: chart("last", .beyond)), moment)
+        XCTAssertEqual(last.jacket(for: chart("lasteternity", .beyond)), eternity)
+        XCTAssertNil(last.jacket(for: chart("last", .eternal)))
+        let day = file("Songs_melodyoflove.jpg", "Day"), night = file("Songs_melodyoflove_night.jpg", "Night")
+        let melody = WikiSongArticle(songIDs: ["melodyoflove"], jackets: [day, night])
+        for difficulty in [Difficulty.past, .present, .future] { XCTAssertEqual(melody.jacket(for: chart("melodyoflove", difficulty)), day) }
+        let english = file("Songs_solitarydream.jpg", "English"), japanese = file("Songs_solitarydream_ja.jpg", "Japanese")
+        XCTAssertEqual(WikiSongArticle(songIDs: ["solitarydream"], jackets: [english, japanese]).jacket(for: chart("solitarydream", .future)), english)
+        // Per-difficulty file names still lose to an explicit tab, and unknown variants stay unmatched.
+        let renamed = file("Songs_ignotusafterburn.jpg", "Beyond")
+        XCTAssertEqual(WikiSongArticle(songIDs: ["ignotus"], jackets: [file("Songs_ignotus.jpg", "Past/Present/Future"), renamed]).jacket(for: chart("ignotus", .beyond)), renamed)
+        XCTAssertNil(WikiSongArticle(songIDs: ["x"], jackets: [file("Songs_x_a.jpg", "Day"), file("Songs_x_b.jpg", "Night")]).jacket(for: chart("x", .future)))
+    }
+    func testArticleScriptReadsEverySongIDOnThePage() async throws {
+        final class Waiter: NSObject, WKNavigationDelegate {
+            var done: CheckedContinuation<Void, Never>?
+            func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?.resume(); done = nil }
+        }
+        let html = #"""
+        <div class="arcaeabox">
+          <div class="tabber"><a role="tab" id="tabber-Moment-label">Moment</a>
+            <article role="tabpanel" id="tabber-Moment" aria-labelledby="tabber-Moment-label"><div class="art-container"><a href="/wiki/File:Songs_last_byd.jpg">x</a></div></article></div>
+          <div class="label">Song ID</div><div class="data">last</div><div class="data data-last">lasteternity</div>
+          <div class="label">Artist</div><div class="data">onoken</div>
+        </div>
+        """#
+        let view = WKWebView(frame: .zero), waiter = Waiter()
+        view.navigationDelegate = waiter
+        await withCheckedContinuation { waiter.done = $0; view.loadHTMLString(html, baseURL: URL(string: "https://arcaea.miraheze.org/wiki/Last")) }
+        let result = try await view.evaluateJavaScript(WikiArtwork.articleScript)
+        let json = try XCTUnwrap(result as? String)
+        let article = try JSONDecoder().decode(WikiSongArticle.self, from: Data(json.utf8))
+        XCTAssertEqual(article.songIDs, ["last", "lasteternity"])
+        XCTAssertEqual(article.jackets, [WikiJacket(filePage: "https://arcaea.miraheze.org/wiki/File:Songs_last_byd.jpg", difficulties: "Moment")])
     }
     func testOnlyOriginalWikiImageURLsAreAccepted() {
         XCTAssertNotNil(WikiArtwork.imageURL("https://static.wikitide.net/arcaeawiki/e/ef/Songs_vexaria.jpg"))

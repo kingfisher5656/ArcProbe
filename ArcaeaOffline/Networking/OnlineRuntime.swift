@@ -8,6 +8,8 @@ import WebKit
     private(set) var recentProfile: AccountProfile?
     private(set) var recentConfiguration: RecentConfiguration?
     private(set) var trackingStatus: TrackingStatus?
+    /// The tracker login was rejected, expired or challenged and needs a fresh sign-in.
+    private(set) var recentNeedsAttention = false
     private(set) var progress = ""
     private(set) var isImporting = false
     var lastError: String?
@@ -19,7 +21,8 @@ import WebKit
     private let recent: RecentSyncService
     private let browser = OfficialLoginBridge()
     private var importTask: Task<ImportReceipt, Error>?
-    private static var cached: OnlineRuntime?
+    /// Called after a background fetch may have added plays, so visible screens can reload.
+    @ObservationIgnored var onArchiveChanged: (@MainActor () -> Void)?
 
     init(store: ArchiveStore, directory: URL, sessions: (any SessionStore)? = nil, transport: any HTTPTransport = URLSessionTransport()) throws {
         archive = store
@@ -31,14 +34,6 @@ import WebKit
         importer = MainImportService(client: client, archive: store)
         recent = RecentSyncService(client: client, archive: store, tracking: tracking)
         trackingStatus = try tracking.status()
-    }
-
-    static func shared() throws -> OnlineRuntime {
-        if let cached { return cached }
-        let directory = try ArchiveLocation.directory()
-        let runtime = try OnlineRuntime(store: ArchiveStore(url: ArchiveLocation.url(), catalog: ChartCatalog.bundled()), directory: directory)
-        cached = runtime
-        return runtime
     }
 
     func refreshStatus() async {
@@ -53,11 +48,13 @@ import WebKit
                 recentProfile = profiles.first { $0.id == id } ?? (recentProfile?.id == id ? recentProfile : AccountProfile(id: id))
             } else { recentProfile = nil }
             recentConfiguration = burner?.recentConfiguration
+            recentNeedsAttention = burner?.requiresAttention ?? false
             trackingStatus = try tracking.status()
         } catch { lastError = safeMessage(error) }
     }
 
     func loginWebView(role: AccountRole) -> WKWebView { browser.webView(role: role) }
+    func reloadLogin(role: AccountRole) { browser.reload(role: role) }
 
     @discardableResult func captureLogin(role: AccountRole) async throws -> AccountProfile {
         if role == .main { cancelImport() }
@@ -157,20 +154,38 @@ import WebKit
         recentProfile = account.profile; recentConfiguration = configuration; trackingStatus = try tracking.status(); lastError = nil
     }
 
-    func fetchRecent(generation: UUID? = nil, finalFetch: Bool = false) async -> FetchResult {
-        let result = await recent.fetch(generation: generation, finalFetch: finalFetch)
+    // MARK: Recent plays
+
+    /// One request on demand, from the app or the one-shot Shortcut action.
+    func fetchRecent() async -> FetchResult {
+        let result = await recent.fetch()
         await refreshStatus()
+        if result.addedCount > 0 { onArchiveChanged?() }
         return result
     }
-    @discardableResult func startTracking() throws -> UUID {
-        let generation = try tracking.start(); trackingStatus = try tracking.status(); return generation
-    }
-    func setMinimumIntervalEnabled(_ enabled: Bool) throws {
-        try tracking.setMinimumIntervalEnabled(enabled)
+
+    /// Arcaea opened. Returns the session the Shortcut loop passes back on every check.
+    @discardableResult func startTracking() async throws -> UUID {
+        guard let configuration = try await sessions.load(role: .burner)?.recentConfiguration else { throw TrackingSetupError.notConfigured }
+        let state = try tracking.status()
+        if state.observer != configuration.observer || state.target != configuration.target { try tracking.bind(configuration: configuration) }
+        let session = try tracking.start()
         trackingStatus = try tracking.status()
+        return session
     }
 
+    /// Arcaea closed. The running loop finishes with a couple of closing checks.
     func stopTracking() throws { try tracking.stop(); trackingStatus = try tracking.status() }
+
+    /// One step of the Shortcut loop.
+    func pollTracking(session: UUID) async -> PollDecision {
+        let before = (try? tracking.status())?.lastNewPlayAt
+        let decision = await recent.poll(session: session)
+        await refreshStatus()
+        if trackingStatus?.lastNewPlayAt != before { onArchiveChanged?() }
+        return decision
+    }
+
     func status() throws -> TrackingStatus { try tracking.status() }
 
     private func showProgress(_ update: ImportProgress) {
@@ -185,8 +200,19 @@ import WebKit
     private func safeMessage(_ error: Error) -> String {
         if let error = error as? OnlineError { return error.localizedDescription }
         if error is CancellationError { return "The operation was cancelled." }
-        if error is TrackingError { return "Tracking is busy, stopped, or waiting until the next permitted request." }
+        if error is TrackingError { return "Another request is running, or the server asked us to wait." }
         if error is ArchiveError { return "The received data could not be saved. Your previous archive is retained." }
         return "The operation could not finish. Your saved archive is retained."
+    }
+}
+
+enum TrackingSetupError: Error, LocalizedError {
+    case notConfigured, needsAttention, invalidSession
+    var errorDescription: String? {
+        switch self {
+        case .notConfigured: "ArcProbe has no tracker account yet. Open ArcProbe → Settings → Tracker account and sign in."
+        case .needsAttention: "ArcProbe tracking stopped: the tracker account needs you to sign in again. Open ArcProbe → Settings → Tracker account."
+        case .invalidSession: "Pass the result of Start Arcaea Tracking as the Session."
+        }
     }
 }

@@ -15,9 +15,13 @@ import WebKit
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.navigationDelegate = self
         views[role] = view
-        view.load(URLRequest(url: URL(string: "https://arcaea.lowiro.com/en/login")!))
+        view.load(URLRequest(url: Self.loginURL))
         return view
     }
+    private static let loginURL = URL(string: "https://arcaea.lowiro.com/en/login")!
+
+    /// Returns to the login page, e.g. after a failed load or to switch accounts.
+    func reload(role: AccountRole) { views[role]?.load(URLRequest(url: Self.loginURL)) }
 
     func capture(role: AccountRole) async throws -> AccountSession {
         guard let view = views[role], let store = stores[role] else { throw OnlineError.expiredSession }

@@ -33,7 +33,7 @@ struct PublicResourceLoader: Sendable {
     func load(_ url: URL, limit: Int, image: Bool = false) async throws -> Data {
         guard url.scheme == "https", ["arcaea.miraheze.org", "webassets.lowiro.com"].contains(url.host ?? ""), url.user == nil, url.password == nil else { throw LibraryResourceError.unavailable }
         var request = URLRequest(url: url)
-        request.setValue("ArcProbe/0.2", forHTTPHeaderField: "User-Agent")
+        request.setValue("ArcProbe/\(AppInfo.shortVersion)", forHTTPHeaderField: "User-Agent")
         let (bytes, response) = try await session.bytes(for: request)
         guard let http = response as? HTTPURLResponse, http.url == url else { throw LibraryResourceError.unavailable }
         if http.statusCode == 429 { throw LibraryResourceError.cooldown(RequestPolicy.retryDate(http.value(forHTTPHeaderField: "Retry-After"), now: Date())) }
@@ -104,7 +104,8 @@ struct PublicResourceLoader: Sendable {
         memory.removeObject(forKey: Self.coverKey(key) as NSString)
         revision += 1
     }
-    func refreshConstants(store: ArchiveStore) async throws {
+    /// Downloads chart constants, then levels and names for charts the app has not seen yet.
+    func refreshChartData(store: ArchiveStore) async throws {
         guard !refreshingConstants else { return }
         refreshingConstants = true; defer { refreshingConstants = false }
         try checkCooldown("constantsCooldown")
@@ -114,7 +115,16 @@ struct PublicResourceLoader: Sendable {
             try await Task.detached { try store.replaceConstants(snapshot) }.value
             constantsDate = snapshot.fetchedAt
             UserDefaults.standard.set(snapshot.fetchedAt, forKey: "constantsFetchedAt")
-            message = "Updated \(snapshot.charts.count) chart constants."
+            // Constants are already saved; a problem with the song list only costs the levels.
+            do {
+                let list = try await loader.load(URL(string: "https://arcaea.miraheze.org/wiki/Data:Songlist.json?action=raw")!, limit: 8 * 1024 * 1024)
+                let levels = try await Task.detached { try SongListSnapshot.parse(list) }.value
+                try await Task.detached { try store.applySongList(levels) }.value
+                message = "Updated constants and levels for \(levels.charts.count) charts."
+            } catch {
+                saveCooldown(error, key: "constantsCooldown")
+                message = "Updated \(snapshot.charts.count) chart constants. Levels could not be updated: \(error.localizedDescription)"
+            }
         } catch { saveCooldown(error, key: "constantsCooldown"); throw error }
     }
     func downloadCovers(charts: [ChartMetadata], refresh: Bool = false) {

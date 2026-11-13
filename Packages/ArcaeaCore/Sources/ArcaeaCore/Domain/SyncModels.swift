@@ -28,7 +28,7 @@ public struct PotentialPoint: Hashable, Codable, Sendable {
     }
 }
 
-public enum ImportKind: String, Codable, Sendable { case full, recent, manual, restore }
+public enum ImportKind: String, Codable, Sendable { case full, recent, manual, restore, consultantSheet }
 
 public struct ImportBatch: Codable, Sendable {
     public let profile: AccountProfile
@@ -62,9 +62,16 @@ public struct ImportReceipt: Hashable, Codable, Sendable {
 }
 
 public enum FetchStatus: String, Codable, Sendable {
-    case success, unchanged, cooldown, alreadyFetching, trackingStopped, staleGeneration
+    case success, unchanged, cooldown, alreadyFetching
     case offline, deadlineExceeded, cancelled, locked, authenticationRequired, attentionRequired
     case wrongAccount, unsupportedSchema, rateLimited, failed
+
+    /// The tracker login cannot continue until the user signs in again or fixes the setup.
+    public var needsAttention: Bool { [.authenticationRequired, .attentionRequired, .wrongAccount].contains(self) }
+    /// The server answered with usable recent data.
+    public var reachedServer: Bool { self == .success || self == .unchanged }
+    /// A failure that should slow down the next request.
+    var backsOff: Bool { [.failed, .deadlineExceeded, .unsupportedSchema].contains(self) }
 }
 
 public struct FetchResult: Codable, Sendable {

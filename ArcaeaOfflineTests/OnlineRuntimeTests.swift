@@ -18,9 +18,11 @@ actor RuntimeTestSessions: SessionStore {
     }
 }
 actor RuntimeTestTransport: HTTPTransport {
+    private(set) var requestedHosts: [String] = []
     var responses: [HTTPResponse]
     init(_ responses: [HTTPResponse]) { self.responses = responses }
     func send(_ request: URLRequest) throws -> HTTPResponse {
+        requestedHosts.append(request.url?.host ?? "")
         guard !responses.isEmpty else { throw OnlineError.network }
         return responses.removeFirst()
     }
@@ -42,6 +44,30 @@ actor RuntimeTestTransport: HTTPTransport {
         XCTAssertEqual(try archive.sourceObservations(accountID: play.accountID).count, 1)
         let persisted = await sessions.load(role: .burner)
         XCTAssertNil(persisted)
+    }
+    func testRecentFetchUsesOnlyArcaeaRequests() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let archive = try ArchiveStore(url: folder.appendingPathComponent("archive.sqlite"))
+        let sessions = RuntimeTestSessions()
+        let response = HTTPResponse(status: 200, headers: ["Content-Type": "application/json", "Set-Cookie": "session=test-only; Path=/; Secure"], body: Data(#"{"value":{"user_id":7,"recent_score":[]}}"#.utf8))
+        let transport = RuntimeTestTransport([response, response, response, response])
+        let runtime = try OnlineRuntime(store: archive, directory: folder, sessions: sessions, transport: transport)
+        try await runtime.configureRecent(email: "test@example.invalid", password: "synthetic", mode: .ownAccountTesting)
+        let first = await runtime.fetchRecent()
+        XCTAssertEqual(first.status, .unchanged)
+        // A manual check is not held to the polling interval.
+        let second = await runtime.fetchRecent()
+        XCTAssertEqual(second.status, .unchanged)
+        let hosts = await transport.requestedHosts
+        XCTAssertFalse(hosts.isEmpty)
+        XCTAssertTrue(hosts.allSatisfy { $0 == "webapi.lowiro.com" })
+    }
+    func testTemporaryGoogleRefreshFailuresDoNotBecomeAuthorizationFailures() {
+        let offline = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
+        let wrapped = NSError(domain: "wrapper", code: 0, userInfo: [NSUnderlyingErrorKey: offline])
+        XCTAssertEqual(GoogleProbeAuth.refreshError(wrapped), .temporaryRefresh)
+        XCTAssertEqual(GoogleProbeAuth.refreshError(NSError(domain: "org.openid.appauth.remote-http", code: 503)), .temporaryRefresh)
+        XCTAssertEqual(GoogleProbeAuth.refreshError(NSError(domain: "org.openid.appauth.oauth_token", code: -1)), .authorization)
     }
     func testKeychainRolesRoundTripAndClearOneRole() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -68,7 +94,7 @@ actor RuntimeTestTransport: HTTPTransport {
         await sessions.save(AccountSession(boundAccount: old.observer, recentConfiguration: old), role: .burner)
         let rejected = HTTPResponse(status: 403, headers: ["Content-Type": "application/json"], body: Data(#"{"error_code":1010}"#.utf8))
         let runtime = try OnlineRuntime(store: archive, directory: folder, sessions: sessions, transport: RuntimeTestTransport([rejected]))
-        _ = try runtime.startTracking()
+        _ = try await runtime.startTracking()
         do { try await runtime.configureRecent(email: "synthetic@example.invalid", password: "synthetic", mode: .ownAccountTesting); XCTFail("Challenge must stop") }
         catch { XCTAssertEqual(error as? OnlineError, .interactionRequired) }
         let session = await sessions.load(role: .burner)

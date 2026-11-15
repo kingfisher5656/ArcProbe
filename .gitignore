@@ -9,3 +9,6 @@ xcuserdata/
 artifacts/
 .cache/
 .test-archives/
+# Owner's personal exports and screenshots
+/B50.jpg
+/WhenArcaea*.PNG

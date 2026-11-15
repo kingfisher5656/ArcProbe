@@ -60,6 +60,27 @@ Shortcut actions run in the app process in the background, with ~30 s per action
 - Wiki covers: `WikiSongArticle.jacket(for:)` picks a jacket by (1) a tab naming the difficulty, (2) a single unlabelled jacket, (3) the file name (`Songs_<id>_byd`, or `Songs_<id>` when its tab is not a difficulty: "Moment", "Day", "English"). A page can list several song IDs ("Last" also holds `lasteternity`).
 - Charts whose page was read without a match are remembered (`wikiUnmatchedCharts`, per app version) so their pages are not reopened on every run.
 
+## Releasing
+
+GitHub repo `kingfisher5656/ArcProbe`, default branch `implementation`. Commit, push, merge and publish only when the owner asks for that step.
+
+1. Bump `MARKETING_VERSION` and `BUILD_NUMBER` in `scripts/generate-project.py`, regenerate the project, run all tests.
+2. Work on a branch, open a PR into `implementation`, merge when asked.
+3. `zsh scripts/package-ipa.sh`, then
+   `gh release create vX.Y.Z artifacts/ArcProbe-X.Y.Z.ipa --title "ArcProbe X.Y.Z" --target <full commit SHA> --notes-file <file>`.
+   `--target` rejects a short SHA. The IPA is the only asset.
+4. Release notes: Korean first, then English (as in the README). Lead with anything the user must redo after updating (for example rebuilding the Shortcut) and include the IPA's SHA-256.
+
+`B50.jpg` and `WhenArcaea*.PNG` in the repo root are the owner's personal files (ignored by git). Leave them alone.
+
+## Open items (as of 2026-11-16, version 0.3.1)
+
+- 0.3.1 was tested only in the iPad simulator. Shortcut automation, SideStore install and real logins are unverified on the physical iPad; if recording misbehaves, first check that the "Arcaea opens" automation starts the new shortcut.
+- Chart data is refreshed only by the "Update constants and levels" button. Nothing refreshes it automatically when a new song appears.
+- A full wiki cover download was not run end to end after the jacket-matching change; the rules were checked against saved copies of the Last, Wandering Melody of Love and Solitary Dream pages.
+
+Remove an item here once it is done.
+
 ## Conventions
 
 - User-facing words: "Main account", "Tracker account", "check" (not poll/fetch), "play", "Consultant sheet".

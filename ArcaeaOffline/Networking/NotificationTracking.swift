@@ -39,8 +39,8 @@ enum NotificationTrackingError: Error, LocalizedError {
     case permission, invalidMessage
     var errorDescription: String? {
         switch self {
-        case .permission: "Allow notifications for ArcProbe first: ArcProbe → Settings → Tracking → Notification method."
-        case .invalidMessage: "Pass the received notification’s Message (body) to Process Tracking Notification."
+        case .permission: String(localized: "Allow notifications for ArcProbe first: ArcProbe → Settings → Shortcut setup → Notification method.")
+        case .invalidMessage: String(localized: "Pass the received notification’s Message (body) to Process Tracking Notification.")
         }
     }
 }

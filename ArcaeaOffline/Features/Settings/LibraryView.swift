@@ -10,11 +10,11 @@ struct LibraryView: View {
     var body: some View {
         List {
             Section {
-                LabeledContent("Last updated", value: resources.constantsDate?.formatted(date: .abbreviated, time: .shortened) ?? "Bundled with the app")
+                LabeledContent(String(localized: "Last updated"), value: resources.constantsDate?.formatted(date: .abbreviated, time: .shortened) ?? String(localized: "Bundled with the app"))
                 Button(resources.refreshingConstants ? "Updating…" : "Update constants and levels", systemImage: "arrow.triangle.2.circlepath") {
                     Task { do { try await resources.refreshChartData(store: model.store); try model.reload() } catch { model.errorMessage = error.localizedDescription } }
                 }.disabled(resources.refreshingConstants)
-            } header: { Text("Chart data") } footer: { Text("Constants, levels and song names from the Arcaea community wiki. Update after a game update adds songs or changes constants.") }
+            } header: { Text("Chart data") } footer: { Text("Constants, levels, song names and packs from the Arcaea community wiki. Update after a game update adds songs or changes constants.") }
             Section {
                 Button("Download missing covers", systemImage: "arrow.down.circle") { resources.downloadCovers(charts: Array(model.catalog.charts.values)) }.disabled(busy)
                 Button("Download sharper wiki covers", systemImage: "sparkles") { showingWiki = true }.disabled(busy)
@@ -24,7 +24,7 @@ struct LibraryView: View {
                     HStack { ProgressView(); Text(resources.progress).font(.subheadline); Spacer(); Button("Cancel") { resources.cancelDownload() } }
                 }
             } header: { Text("Cover art") } footer: {
-                Text("Covers are known for songs that appear in a main-account import. Wiki covers are larger originals and replace the official one where the song and difficulty match exactly.")
+                Text("Covers are known for songs that appear in a main-account import. Wiki covers are larger originals and replace the official one where the song and difficulty match exactly. Covers copied from the Arcaea game folder come first.")
             }
             if let message = resources.message { Section { Text(message).font(.subheadline).foregroundStyle(.secondary) } }
         }

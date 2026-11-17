@@ -83,7 +83,7 @@ public struct ScoreValues: Hashable, Codable, Sendable {
 }
 
 public enum ObservationSource: String, Codable, Sendable {
-    case officialImport, officialRecent, manual, consultantSheet
+    case officialImport, officialRecent, manual, consultantSheet, gameData
 }
 public enum IdentityConfidence: String, Codable, Sendable {
     case sourceEvent, exactTimestampAndPayload, payloadOnly, manual
@@ -148,6 +148,9 @@ public struct EffectiveObservation: Hashable, Codable, Sendable {
     public let original: ScoreObservation
     public let values: ScoreValues
     public let isOverridden: Bool
+    public init(original: ScoreObservation, values: ScoreValues, isOverridden: Bool) {
+        self.original = original; self.values = values; self.isOverridden = isOverridden
+    }
 }
 
 public struct BestScore: Hashable, Codable, Sendable {

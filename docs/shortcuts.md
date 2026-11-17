@@ -2,6 +2,8 @@
 
 ArcProbe cannot see when Arcaea is running. Two personal automations in the Shortcuts app tell it, and a small loop asks ArcProbe to check for a new play about once a minute while Arcaea is open.
 
+The action names below are the English ones. With the device in Korean they are **Arcaea 추적 시작** (Start Arcaea Tracking), **최근 플레이 확인** (Check Recent Play), **Arcaea 추적 중지** (Stop Arcaea Tracking), **최근 플레이 한 번 가져오기** (Fetch Recent Play Once), **알림 방식 추적 시작** (Start Notification Tracking) and **추적 알림 처리** (Process Tracking Notification). A shortcut built under one language keeps working under the other.
+
 Set up the tracker account first (ArcProbe → gear button → Tracker account).
 
 ## 1. The shortcut

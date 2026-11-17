@@ -6,7 +6,7 @@ enum ScoreEditorDestination: Identifiable {
     var id: String { switch self { case .add: "add"; case .addForChart(let chart): "add:\(chart.key)"; case .edit(let play): "edit:\(play.original.id.rawValue)"; case .correctBest(let chart, _): "best:\(chart.key)" } }
     var chart: ChartID? { switch self { case .add: nil; case .addForChart(let chart), .correctBest(let chart, _): chart; case .edit(let play): play.original.chartID } }
     var values: ScoreValues? { switch self { case .edit(let play): play.values; case .correctBest(_, let values): values; default: nil } }
-    var title: String { switch self { case .edit: "Edit play"; case .correctBest: "Correct chart best"; default: "Add score" } }
+    var title: String { switch self { case .edit: String(localized: "Edit play"); case .correctBest: String(localized: "Correct chart best"); default: String(localized: "Add score") } }
 }
 
 struct ScoreEditorView: View {
@@ -53,7 +53,7 @@ struct ScoreEditorView: View {
             Form {
                 if let validation { Section { HStack { Image(systemName: "exclamationmark.circle"); Text(validation).accessibilityIdentifier("validationMessage") }.foregroundStyle(.red) } }
                 Section("Chart") {
-                    Button { choosingChart = true } label: { HStack { Text(chart.map { model.title($0) } ?? "Choose a chart"); Spacer(); if let chart { ChartBadge(chart: chart) }; Image(systemName: "chevron.right").foregroundStyle(.secondary) } }.accessibilityIdentifier("chooseChart")
+                    Button { choosingChart = true } label: { HStack { Text(chart.map { model.title($0) } ?? String(localized: "Choose a chart")); Spacer(); if let chart { ChartBadge(chart: chart) }; Image(systemName: "chevron.right").foregroundStyle(.secondary) } }.accessibilityIdentifier("chooseChart")
                         .disabled(destination.values != nil)
                 }
                 Section("Score and clear") {
@@ -77,17 +77,17 @@ struct ScoreEditorView: View {
             .sheet(isPresented: $choosingChart) { ChartPickerView(selected: $chart) }
         }
     }
-    private func numberField(_ title: String, text: Binding<String>) -> some View { HStack { Text(title); Spacer(); TextField("Unknown", text: text).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(maxWidth: 150) } }
-    private func clearPicker(_ title: String, selection: Binding<ClearType?>) -> some View { Picker(title, selection: selection) { Text("Unknown").tag(ClearType?.none); ForEach(ClearType.allCases, id: \.self) { Text(DisplayFormat.clear($0)).tag(Optional($0)) } } }
+    private func numberField(_ title: LocalizedStringKey, text: Binding<String>) -> some View { HStack { Text(title); Spacer(); TextField("Unknown", text: text).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(maxWidth: 150) } }
+    private func clearPicker(_ title: LocalizedStringKey, selection: Binding<ClearType?>) -> some View { Picker(title, selection: selection) { Text("Unknown").tag(ClearType?.none); ForEach(ClearType.allCases, id: \.self) { Text(DisplayFormat.clear($0)).tag(Optional($0)) } } }
     private func optionalCount(_ value: String) throws -> Int? {
         guard !value.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
-        guard let count = Int(value), count >= 0 else { throw ArchiveError.invalidRecord("Judgment counts must be positive whole numbers or blank.") }
+        guard let count = Int(value), count >= 0 else { throw ArchiveError.invalidRecord(String(localized: "Judgment counts must be positive whole numbers or blank.")) }
         return count
     }
     private func save() {
         do {
-            guard let chart else { throw ArchiveError.invalidRecord("Choose a chart first.") }
-            guard let value = Int(score.replacingOccurrences(of: ",", with: "")) else { throw ArchiveError.invalidRecord("Enter a whole-number score.") }
+            guard let chart else { throw ArchiveError.invalidRecord(String(localized: "Choose a chart first.")) }
+            guard let value = Int(score.replacingOccurrences(of: ",", with: "")) else { throw ArchiveError.invalidRecord(String(localized: "Enter a whole-number score.")) }
             let judgments = Judgments(pure: try optionalCount(pure), shinyPure: try optionalCount(shiny), far: try optionalCount(far), lost: try optionalCount(lost), early: try optionalCount(early), late: try optionalCount(late))
             let hasJudgments = [judgments.pure, judgments.shinyPure, judgments.far, judgments.lost, judgments.early, judgments.late].contains { $0 != nil }
             let draft = ScoreDraft(chartID: chart, score: value, playedAt: hasDate ? date : nil, judgments: hasJudgments ? judgments : nil, playClear: playClear, bestClear: bestClear, modifier: try optionalCount(modifier), health: try optionalCount(health), clearModifier: modifier.isEmpty, clearHealth: health.isEmpty)

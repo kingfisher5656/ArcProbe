@@ -6,7 +6,7 @@ struct ConsultantExportView: View {
     @State private var model = ConsultantProbeModel.shared
     @State private var confirm = false
     @State private var mode: ConsultantExportMode = .improvementsOnly
-    private var accountName: String { archive.selectedProfile?.displayName ?? archive.selectedAccountID?.rawValue ?? "No account selected" }
+    private var accountName: String { archive.selectedProfile?.displayName ?? archive.selectedAccountID?.rawValue ?? String(localized: "No account selected") }
     private var plan: ConsultantExportPlan? { model.exportPlan?.accountID == archive.selectedAccountID && model.exportPlan?.mode == mode ? model.exportPlan : nil }
     private var reviewedEntries: [ConsultantExportPlan.Entry] { plan?.entries.filter { $0.disposition != .unchanged } ?? [] }
     var body: some View {
@@ -58,9 +58,9 @@ struct ConsultantExportView: View {
                     if reviewedEntries.isEmpty { Text("All recognized mobile scores already match.").foregroundStyle(.secondary) }
                     ForEach(reviewedEntries) { entry in
                         VStack(alignment: .leading, spacing: 5) {
-                            Text(entry.title.isEmpty ? "Unrecognized row \(entry.id)" : entry.title).font(.headline)
+                            Text(entry.title.isEmpty ? String(localized: "Unrecognized row \(entry.id)") : entry.title).font(.headline)
                             if entry.changesScore, let old = entry.previousScore, let new = entry.score {
-                                Text("\(DisplayFormat.score(old)) → \(new == 0 ? "Unplayed" : DisplayFormat.score(new))").monospacedDigit()
+                                Text(verbatim: "\(DisplayFormat.score(old)) → \(new == 0 ? String(localized: "Unplayed") : DisplayFormat.score(new))").monospacedDigit()
                             }
                             Text(reason(entry.disposition)).font(.subheadline)
                                 .foregroundStyle(entry.changesScore ? Color.orange : Color.secondary)
@@ -90,16 +90,16 @@ struct ConsultantExportView: View {
     }
     private func reason(_ disposition: ConsultantExportPlan.Disposition) -> String {
         switch disposition {
-        case .increase: "Ready — higher or new best"
-        case .decrease: "Ready — replace with lower ArcProbe best"
-        case .clear: "Ready — clear score absent from ArcProbe"
-        case .unchanged: "Already matching"
-        case .keepHigher: "Kept — sheet score is higher or absent from ArcProbe"
-        case .formula: "Skipped — input contains a formula"
-        case .unmapped: "Skipped — song not recognized"
-        case .ambiguous: "Skipped — more than one chart matches"
-        case .invalid: "Skipped — unsupported score, difficulty or note count"
-        case .duplicate: "Skipped — multiple sheet rows match this chart"
+        case .increase: String(localized: "Ready — higher or new best")
+        case .decrease: String(localized: "Ready — replace with lower ArcProbe best")
+        case .clear: String(localized: "Ready — clear score absent from ArcProbe")
+        case .unchanged: String(localized: "Already matching")
+        case .keepHigher: String(localized: "Kept — sheet score is higher or absent from ArcProbe")
+        case .formula: String(localized: "Skipped — input contains a formula")
+        case .unmapped: String(localized: "Skipped — song not recognized")
+        case .ambiguous: String(localized: "Skipped — more than one chart matches")
+        case .invalid: String(localized: "Skipped — unsupported score, difficulty or note count")
+        case .duplicate: String(localized: "Skipped — multiple sheet rows match this chart")
         }
     }
 }

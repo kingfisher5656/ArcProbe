@@ -17,10 +17,10 @@ enum CoverBackup {
         case invalid, limit, unsafeFile, empty
         var errorDescription: String? {
             switch self {
-            case .invalid: "This cover backup is damaged or unsupported. No covers were restored."
-            case .limit: "The cover backup exceeds the supported size or cover count."
-            case .unsafeFile: "The cover backup contains an unsafe file or filename."
-            case .empty: "There are no downloaded covers to export yet."
+            case .invalid: String(localized: "This cover backup is damaged or unsupported. No covers were restored.")
+            case .limit: String(localized: "The cover backup exceeds the supported size or cover count.")
+            case .unsafeFile: String(localized: "The cover backup contains an unsafe file or filename.")
+            case .empty: String(localized: "There are no downloaded covers to export yet.")
             }
         }
     }

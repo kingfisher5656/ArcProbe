@@ -28,7 +28,7 @@ public struct PotentialPoint: Hashable, Codable, Sendable {
     }
 }
 
-public enum ImportKind: String, Codable, Sendable { case full, recent, manual, restore, consultantSheet }
+public enum ImportKind: String, Codable, Sendable { case full, recent, manual, restore, consultantSheet, gameData }
 
 public struct ImportBatch: Codable, Sendable {
     public let profile: AccountProfile

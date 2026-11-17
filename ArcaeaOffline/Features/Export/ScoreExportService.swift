@@ -16,7 +16,7 @@ struct ShareSheet: UIViewControllerRepresentable {
         var lines = [header.joined(separator: ",")]
         for row in rows {
             let best = row.best, values = best.values, metadata = model.catalog[best.chartID]
-            let sourceLabel = model.observations.first { $0.original.id == best.observationID }.map { model.sourceLabel($0) } ?? "manual best correction"
+            let sourceLabel = model.observations.first { $0.original.id == best.observationID }.map { model.sourceLabel($0, forFile: true) } ?? "manual best correction"
             let fields = [row.rank.map(String.init) ?? "unrated", best.chartID.songID, model.title(best.chartID), metadata?.artist ?? "unknown", (metadata?.displayDifficulty ?? best.chartID.difficulty.label), metadata?.level ?? "unknown", metadata?.usableConstant.map { String(format: "%.1f", $0.value) } ?? "unknown", String(values.score), DisplayFormat.grade(values.score), row.ratingUnits.map { RatingCalculator.display($0) } ?? "unknown", DisplayFormat.clear(values.playClear), DisplayFormat.clear(best.bestClear), values.playedAt?.date?.ISO8601Format() ?? "unknown", values.playedAt?.origin.rawValue ?? "unknown", sourceLabel, best.isOverridden || best.isBestCorrection ? "true" : "false", count(values.judgments?.pure), count(values.judgments?.shinyPure), count(values.judgments?.far), count(values.judgments?.lost), count(values.judgments?.early), count(values.judgments?.late)]
             lines.append(fields.map(csvCell).joined(separator: ","))
         }
@@ -36,8 +36,7 @@ struct ShareSheet: UIViewControllerRepresentable {
         for index in cards.indices {
             try Task.checkCancellation()
             let chart = cards[index].row.best.chartID
-            let identifiers = ["wiki:\(chart.songID):\(chart.difficulty.rawValue)"]
-                + (cards[index].metadata?.artworkIdentifier.map { [$0] } ?? [])
+            let identifiers = LibraryResources.coverIdentifiers(chart: chart, official: cards[index].metadata?.artworkIdentifier)
             cards[index].cover = await coverLoader.image(identifiers: identifiers, pixels: 360, revision: revision)
         }
         try Task.checkCancellation()

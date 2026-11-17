@@ -11,7 +11,7 @@ struct MainAccountView: View {
     var body: some View {
         List {
             Section {
-                LabeledContent("Signed in as", value: runtime.mainProfile.map { $0.displayName ?? $0.id.rawValue } ?? "Not signed in")
+                LabeledContent(String(localized: "Signed in as"), value: runtime.mainProfile.map { $0.displayName ?? $0.id.rawValue } ?? String(localized: "Not signed in"))
                 Button(runtime.mainProfile == nil ? "Sign in" : "Switch account", systemImage: "person.crop.circle") { login = LoginRequest(role: .main) }
                     .disabled(runtime.isImporting).accessibilityIdentifier("main.signIn")
             }
@@ -43,7 +43,7 @@ struct MainAccountView: View {
                 let receipt = try await runtime.fullImport()
                 model.selectedAccountID = receipt.accountID
                 try model.reload()
-                model.notice = "Import complete: \(receipt.addedCount) new plays"
+                model.notice = String(localized: "Import complete: \(receipt.addedCount) new plays")
             } catch { model.errorMessage = error.localizedDescription }
             importTask = nil
         }

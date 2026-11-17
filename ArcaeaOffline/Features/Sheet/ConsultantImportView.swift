@@ -6,7 +6,7 @@ struct ConsultantImportView: View {
     @State private var model = ConsultantProbeModel.shared
     @State private var confirm = false
     private var account: AccountID { archive.selectedAccountID ?? AccountID("local") }
-    private var accountName: String { archive.selectedProfile?.displayName ?? archive.selectedAccountID?.rawValue ?? "Local archive" }
+    private var accountName: String { archive.selectedProfile?.displayName ?? archive.selectedAccountID?.rawValue ?? String(localized: "Local archive") }
     var body: some View {
         List {
             Section("Import into \(accountName)") {
@@ -43,7 +43,7 @@ struct ConsultantImportView: View {
                     if plan.entries.isEmpty { Text("No scored mobile charts were found in this sheet.").foregroundStyle(.secondary) }
                     ForEach(plan.entries) { entry in
                         VStack(alignment: .leading, spacing: 5) {
-                            Text(entry.title.isEmpty ? "Unrecognized row \(entry.id)" : entry.title).font(.headline)
+                            Text(entry.title.isEmpty ? String(localized: "Unrecognized row \(entry.id)") : entry.title).font(.headline)
                             if let score = entry.score { Text(DisplayFormat.score(score)).monospacedDigit() }
                             Text(reason(entry.disposition)).font(.subheadline)
                                 .foregroundStyle(entry.disposition == .add ? Color.green : Color.secondary)
@@ -61,13 +61,13 @@ struct ConsultantImportView: View {
     }
     private func reason(_ disposition: ConsultantImportPlan.Disposition) -> String {
         switch disposition {
-        case .add: "Ready — new chart best"
-        case .keepExisting: "Skipped — existing best is equal or higher"
-        case .manualProtected: "Skipped — manual correction or deletion is preserved"
-        case .unmapped: "Skipped — song not matched; try updating chart metadata"
-        case .ambiguous: "Skipped — more than one chart matches this title"
-        case .invalid: "Skipped — unsupported score, difficulty or note count"
-        case .duplicate: "Skipped — multiple sheet rows match the same chart"
+        case .add: String(localized: "Ready — new chart best")
+        case .keepExisting: String(localized: "Skipped — existing best is equal or higher")
+        case .manualProtected: String(localized: "Skipped — manual correction or deletion is preserved")
+        case .unmapped: String(localized: "Skipped — song not matched; try updating chart metadata")
+        case .ambiguous: String(localized: "Skipped — more than one chart matches this title")
+        case .invalid: String(localized: "Skipped — unsupported score, difficulty or note count")
+        case .duplicate: String(localized: "Skipped — multiple sheet rows match the same chart")
         }
     }
 }

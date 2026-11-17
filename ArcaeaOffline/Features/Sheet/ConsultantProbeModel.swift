@@ -21,7 +21,7 @@ import ArcaeaCore
     private(set) var pending = false
     private(set) var journalUnreadable = false
     private(set) var metadata: SheetMetadata?
-    private(set) var status = "Connect Google to import or send sheet scores."
+    private(set) var status = String(localized: "Connect Google to import or send sheet scores.")
     private(set) var reportLines: [String] = []
     private(set) var refreshAvailable = false
     private(set) var diagnosticsSaveFailed = false
@@ -53,59 +53,59 @@ import ArcaeaCore
         do { reportLines = try diagnostics.loadLines() }
         catch { reportLines = ["Earlier diagnostic history could not be read."] }
         updateState()
-        if connected { status = "Google connection restored." }
-        if auth.storageIssue { status = "Saved Google session could not be loaded. Reconnect before testing." }
+        if connected { status = String(localized: "Google connection restored.") }
+        if auth.storageIssue { status = String(localized: "Saved Google session could not be loaded. Reconnect before testing.") }
         saveDiagnostics()
     }
     func connect() async {
-        await perform("Google sign-in / Picker") {
+        await perform(String(localized: "Google sign-in / Picker")) {
             let required = try self.journal.load()?.fileID ?? self.exportJournal.load()?.fileID
             self.metadata = nil
             self.clearImportPreview(); self.clearExportPreview()
             try await self.auth.connect(requiredFileID: required)
             self.updateState()
             try await self.readMetadata()
-            self.record("Connected to the workbook.")
+            self.record(String(localized: "Connected to the workbook."))
         }
     }
     func read() async {
-        await perform("Sheet API read") {
+        await perform(String(localized: "Sheet API read")) {
             try await self.readMetadata()
             guard let metadata = self.metadata, let tab = metadata.inputTab else {
-                self.record("This workbook does not look like a consultant sheet."); return
+                self.record(String(localized: "This workbook does not look like a consultant sheet.")); return
             }
             // Only inspect the fixed fixture in the designated disposable workbook.
             if metadata.id == ProbeRunner.testFileID {
                 _ = try await self.api.snapshot(fileID: metadata.id, inputTab: tab)
-                self.record("Test workbook ready. No cells changed.")
-            } else { self.record("Workbook ready.") }
+                self.record(String(localized: "Test workbook ready. No cells changed."))
+            } else { self.record(String(localized: "Workbook ready.")) }
         }
     }
     func refresh() async {
-        await perform("Refresh-token test") {
+        await perform(String(localized: "Refresh-token test")) {
             _ = try await self.auth.token(forceRefresh: true)
             try await self.readMetadata()
-            self.record("Forced refresh + API metadata: PASS.")
+            self.record(String(localized: "Forced refresh + API metadata: PASS."))
         }
     }
     func recover() async {
-        await perform("Pending test recovery") {
+        await perform(String(localized: "Pending test recovery")) {
             let runner = ProbeRunner(sheet: self.api, journal: self.journal); self.runner = runner
             defer { self.runner = nil }
             try await runner.restore()
-            self.record("Recovery: original input and formula values verified. No pending test.")
+            self.record(String(localized: "Recovery: original input and formula values verified. No pending test."))
         }
     }
     func disconnect() {
         guard !busy, !pending, !journalUnreadable, !exportPending, !exportJournalUnreadable else { return }
-        do { try auth.disconnect(); metadata = nil; clearImportPreview(); clearExportPreview(); updateState(); record("Google session removed from this device. Google account access can also be revoked in Google settings.") }
-        catch { record("Could not remove the saved Google session.") }
+        do { try auth.disconnect(); metadata = nil; clearImportPreview(); clearExportPreview(); updateState(); record(String(localized: "Google session removed from this device. Google account access can also be revoked in Google settings.")) }
+        catch { record(String(localized: "Could not remove the saved Google session.")) }
     }
     func clearImportPreview() { importPlan = nil; importFileID = nil }
     func previewImport(store: ArchiveStore, accountID: AccountID) async {
         guard !busy else { return }
         clearImportPreview()
-        await perform("Read sheet scores") {
+        await perform(String(localized: "Read sheet scores")) {
             guard !self.pending, !self.journalUnreadable, !self.exportPending, !self.exportJournalUnreadable else { throw ProbeError.pending }
             try await self.readMetadata()
             guard let fileID = self.selectedID, self.metadata?.inputTab != nil else { throw ConsultantImportError.unsupportedLayout }
@@ -113,11 +113,11 @@ import ArcaeaCore
             let plan = try await Task.detached { try store.previewConsultantImport(snapshot, accountID: accountID) }.value
             guard self.selectedID == fileID else { throw ProbeError.invalidSelection }
             self.importPlan = plan; self.importFileID = fileID
-            self.record("Import preview ready: \(plan.addCount) scores can be added; \(plan.entries.count - plan.addCount) scored rows skipped. No archive or sheet scores changed.")
+            self.record(String(localized: "Import preview ready: \(plan.addCount) scores can be added; \(plan.entries.count - plan.addCount) scored rows skipped. No archive or sheet scores changed."))
         }
     }
     func applyImport(archive: ArchiveModel) async {
-        await perform("Import sheet scores") {
+        await perform(String(localized: "Import sheet scores")) {
             guard !self.pending, !self.journalUnreadable, !self.exportPending, !self.exportJournalUnreadable, let plan = self.importPlan,
                   let fileID = self.importFileID, self.selectedID == fileID,
                   plan.accountID == (archive.selectedAccountID ?? AccountID("local")) else { throw ConsultantImportError.stalePreview }
@@ -126,14 +126,14 @@ import ArcaeaCore
             archive.selectedAccountID = plan.accountID
             try archive.reload()
             self.clearImportPreview()
-            self.record("Imported \(receipt.addedCount) sheet scores into ArcProbe. Google sheet unchanged. History uses the import date; play dates and clear lamps remain unknown.")
+            self.record(String(localized: "Imported \(receipt.addedCount) sheet scores into ArcProbe. Google sheet unchanged. History uses the import date; play dates and clear lamps remain unknown."))
         }
     }
     func clearExportPreview() { exportPlan = nil; exportFileID = nil; exportInputTab = nil }
     func previewExport(store: ArchiveStore, accountID: AccountID, mode: ConsultantExportMode) async {
         guard !busy else { return }
         clearExportPreview()
-        await perform("Compare ArcProbe and sheet scores") {
+        await perform(String(localized: "Compare ArcProbe and sheet scores")) {
             guard !self.pending, !self.journalUnreadable, !self.exportPending, !self.exportJournalUnreadable else { throw ConsultantExportError.pending }
             try await self.readMetadata()
             guard let fileID = self.selectedID, let tab = self.metadata?.inputTab else { throw ConsultantExportError.layout }
@@ -141,11 +141,11 @@ import ArcaeaCore
             let plan = try await Task.detached { try store.previewConsultantExport(snapshot, accountID: accountID, mode: mode) }.value
             guard self.selectedID == fileID else { throw ConsultantExportError.selection }
             self.exportPlan = plan; self.exportFileID = fileID; self.exportInputTab = tab
-            self.record("Send preview ready: \(plan.changes.count) mobile score changes. Nothing sent yet.")
+            self.record(String(localized: "Send preview ready: \(plan.changes.count) mobile score changes. Nothing sent yet."))
         }
     }
     func applyExport(archive: ArchiveModel, mode: ConsultantExportMode) async {
-        await perform("Send reviewed scores") {
+        await perform(String(localized: "Send reviewed scores")) {
             guard !self.pending, !self.journalUnreadable, !self.exportPending, !self.exportJournalUnreadable,
                   let plan = self.exportPlan, plan.mode == mode, let fileID = self.exportFileID, let tab = self.exportInputTab,
                   self.selectedID == fileID, archive.selectedAccountID == plan.accountID else { throw ConsultantExportError.selection }
@@ -156,21 +156,21 @@ import ArcaeaCore
             let count = try await self.exportService.send(plan, fileID: fileID, inputTab: tab, store: archive.store) {
                 guard self.selectedID == fileID, archive.selectedAccountID == plan.accountID else { throw ConsultantExportError.selection }
             }
-            self.record("Sent and verified \(count) mobile scores. ArcProbe's archive was unchanged.")
+            self.record(String(localized: "Sent and verified \(count) mobile scores. ArcProbe's archive was unchanged."))
         }
     }
     func verifyExport() async {
-        await perform("Verify pending sheet send") {
+        await perform(String(localized: "Verify pending sheet send")) {
             guard let fileID = self.selectedID else { throw ConsultantExportError.selection }
             let count = try await self.exportService.verifyPending(fileID: fileID)
-            self.record("Verified \(count) sent scores. Pending send cleared; no extra writes made.")
+            self.record(String(localized: "Verified \(count) sent scores. Pending send cleared; no extra writes made."))
         }
     }
     func dismissExportAfterReview() async {
-        await perform("Dismiss reviewed send record") {
+        await perform(String(localized: "Dismiss reviewed send record")) {
             try self.exportService.dismissPendingAfterReview()
             self.clearExportPreview(); self.clearImportPreview()
-            self.record("Pending send record dismissed after your review. No sheet cells changed. Refresh the preview before another send.")
+            self.record(String(localized: "Pending send record dismissed after your review. No sheet cells changed. Refresh the preview before another send."))
         }
     }
     private func readMetadata() async throws {
@@ -192,21 +192,21 @@ import ArcaeaCore
             else if let error = error as? SheetReadError { message = error.localizedDescription }
             else if let error = error as? SheetHTTPError { message = error.localizedDescription }
             else if let error = error as? GoogleProbeAuth.AuthError { message = error.localizedDescription }
-            else { message = "Network or local storage operation failed. Retry when connected and unlocked. Any pending recovery is retained." }
+            else { message = String(localized: "Network or local storage operation failed. Retry when connected and unlocked. Any pending recovery is retained.") }
             record(operation + ": " + message)
         }
     }
     private func updateState() {
         connected = auth.connected; refreshAvailable = auth.canRefresh
         do { pending = try journal.load() != nil; journalUnreadable = false }
-        catch { pending = true; journalUnreadable = true; status = "The recovery record cannot be read. Do not run another test or uninstall this build; inspect the test cell in Google Sheets." }
+        catch { pending = true; journalUnreadable = true; status = String(localized: "The recovery record cannot be read. Do not run another test or uninstall this build; inspect the test cell in Google Sheets.") }
         do { exportPending = try exportJournal.load() != nil; exportJournalUnreadable = false }
-        catch { exportPending = true; exportJournalUnreadable = true; status = "The pending send record cannot be read. Keep the app installed and check the sheet before sending again." }
+        catch { exportPending = true; exportJournalUnreadable = true; status = String(localized: "The pending send record cannot be read. Keep the app installed and check the sheet before sending again.") }
         saveDiagnostics()
     }
-    func editorOpened() { record("Opened Apple in-app browser. Its Google login is separate from API authorization.") }
+    func editorOpened() { record(String(localized: "Opened Apple in-app browser. Its Google login is separate from API authorization.")) }
     func editorInitialLoad(_ succeeded: Bool) {
-        record(succeeded ? "In-app browser initial navigation loaded. Private workbook access and editing still require visual confirmation." : "In-app browser initial navigation failed. Check connectivity or try the external browser link.")
+        record(succeeded ? String(localized: "In-app browser initial navigation loaded. Private workbook access and editing still require visual confirmation.") : String(localized: "In-app browser initial navigation failed. Check connectivity or try the external browser link."))
     }
     private func saveDiagnostics() {
         do { try diagnostics.save(lines: reportLines, report: report); diagnosticsSaveFailed = false }

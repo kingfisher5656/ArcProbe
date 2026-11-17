@@ -80,5 +80,5 @@ actor KeychainSessionStore: SessionStore {
 enum SessionStorageError: Error, LocalizedError {
     case unavailable
     case keychainFailure(OSStatus)
-    var errorDescription: String? { "Secure account storage is unavailable. Saved scores are unchanged." }
+    var errorDescription: String? { String(localized: "Secure account storage is unavailable. Saved scores are unchanged.") }
 }

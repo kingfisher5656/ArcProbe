@@ -47,7 +47,7 @@ extension ArchiveStore {
             syncedAt: batch.importedAt, scores: ScoreReconciler.best(accountID: batch.profile.id, observations: raw)))
     }
 
-    /// Official continuation, or a local series starting at the first sheet import. Never reconstructs older plays.
+    /// Official continuation, or a local series starting at the first sheet or game-folder import. Never reconstructs older plays.
     public func localPotentialHistory(accountID: AccountID) throws -> [PotentialPoint] {
         try locked {
             try database.transaction(write: false) {
@@ -77,7 +77,7 @@ private enum PotentialContinuation {
     }
     static func withoutOfficialHistory(accountID: AccountID, observations: [EffectiveObservation],
                                        corrections: [BestCorrection], catalog: ChartCatalog) throws -> [PotentialPoint] {
-        guard let start = observations.filter({ $0.original.source == .consultantSheet }).map({ $0.original.firstSeenAt }).min() else { return [] }
+        guard let start = observations.filter({ [.consultantSheet, .gameData].contains($0.original.source) }).map({ $0.original.firstSeenAt }).min() else { return [] }
         // Seed from records already known at the first import, never backfill their old play dates.
         let earlier = observations.filter { $0.original.firstSeenAt < start }
         let earlierCorrections = corrections.filter { ($0.recordedAt ?? .distantPast) < start }

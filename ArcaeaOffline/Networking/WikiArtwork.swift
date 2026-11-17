@@ -48,9 +48,9 @@ enum WikiArtworkError: LocalizedError {
     case unavailable, unsupported, cancelled
     var errorDescription: String? {
         switch self {
-        case .unavailable: "The wiki did not load. Existing covers are retained. If a browser check is shown, complete it yourself, then retry."
-        case .unsupported: "The wiki page could not be matched safely to this song and difficulty. Existing covers are retained."
-        case .cancelled: "Wiki download stopped. Completed covers are retained."
+        case .unavailable: String(localized: "The wiki did not load. Existing covers are retained. If a browser check is shown, complete it yourself, then retry.")
+        case .unsupported: String(localized: "The wiki page could not be matched safely to this song and difficulty. Existing covers are retained.")
+        case .cancelled: String(localized: "Wiki download stopped. Completed covers are retained.")
         }
     }
 }
@@ -58,7 +58,7 @@ enum WikiArtworkError: LocalizedError {
 @MainActor @Observable final class WikiArtwork: NSObject, WKNavigationDelegate, WKDownloadDelegate {
     let webView: WKWebView
     private(set) var running = false
-    private(set) var status = "Download original wiki jackets for imported songs. Keep this screen open."
+    private(set) var status = String(localized: "Download original wiki jackets for imported songs. Keep this screen open.")
     private var task: Task<Void, Never>?
     private var currentNavigation: WKNavigation?
     private var navigation: CheckedContinuation<Void, Error>?
@@ -198,7 +198,7 @@ enum WikiArtworkError: LocalizedError {
             var unmatched = retryUnmatched ? [] : Self.loadUnmatched()
             defer { saveUnmatched(unmatched) }
             do {
-                status = "Reading the song list…"
+                status = String(localized: "Reading the song list…")
                 try await load(URL(string: "https://arcaea.miraheze.org/wiki/Song_list")!)
                 struct Link: Decodable { let title: String; let url: String }
                 let links = try await evaluate(#"JSON.stringify(Array.from(document.querySelectorAll('table tr')).flatMap(r => {const a=r.querySelector('td a');return a?[{title:a.textContent.trim(),url:a.href}]:[]}))"#, as: [Link].self)
@@ -207,14 +207,14 @@ enum WikiArtworkError: LocalizedError {
                 var saved = 0, skipped = 0
                 for (index, group) in groups.enumerated() {
                     try Task.checkCancellation()
-                    let missing = group.value.filter { !LibraryResources.shared.hasWikiCover($0.id) }
+                    let missing = group.value.filter { !LibraryResources.shared.hasWikiCover($0.id) && !LibraryResources.shared.hasGameCover($0.id) }
                     let needed = missing.filter { !unmatched.contains(Self.key($0.id)) }
                     skipped += missing.count - needed.count
                     if needed.isEmpty { continue }
                     let titles = Set(needed.compactMap(\.title).map { $0.lowercased() })
                     let candidates = Set(links.filter { titles.contains($0.title.lowercased()) }.map(\.url))
                     guard candidates.count == 1, let address = candidates.first, let url = Self.wikiURL(address) else { skipped += needed.count; continue }
-                    status = "Song \(index + 1) of \(groups.count) · \(needed.first?.title ?? group.key)"
+                    status = String(localized: "Song \(index + 1) of \(groups.count) · \(needed.first?.title ?? group.key)")
                     try await load(url)
                     let article = try await evaluate(Self.articleScript, as: WikiSongArticle.self)
                     guard !article.songIDs.isEmpty else { throw WikiArtworkError.unavailable }
@@ -246,8 +246,8 @@ enum WikiArtworkError: LocalizedError {
                     }
                     try await Task.sleep(for: .seconds(1))
                 }
-                status = "Saved \(saved) chart covers. \(skipped) charts without a matching wiki jacket keep their existing artwork."
-            } catch is CancellationError { status = "Stopped. Completed covers are retained." }
+                status = String(localized: "Saved \(saved) chart covers. \(skipped) charts without a matching wiki jacket keep their existing artwork.")
+            } catch is CancellationError { status = String(localized: "Stopped. Completed covers are retained.") }
             catch { status = error.localizedDescription }
         }
     }

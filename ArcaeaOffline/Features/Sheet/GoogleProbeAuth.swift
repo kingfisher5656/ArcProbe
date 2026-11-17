@@ -148,12 +148,12 @@ import ConsultantProbeCore
         case storage, presentation, authorization, noRefresh, cancelled, temporaryRefresh
         var errorDescription: String? {
             switch self {
-            case .storage: "Google session could not be saved in Keychain. Unlock the device and retry."
-            case .presentation: "Keep ArcProbe in the foreground, then connect again."
-            case .authorization: "Google sign-in was cancelled or failed. Check consent test-user access, client configuration and the callback after SideStore installation, then reconnect."
-            case .noRefresh: "No refresh token was granted. Connect again and complete consent."
-            case .cancelled: "Sign-in was cancelled."
-            case .temporaryRefresh: "Google token refresh temporarily failed. Retry when connected."
+            case .storage: String(localized: "Google session could not be saved in Keychain. Unlock the device and retry.")
+            case .presentation: String(localized: "Keep ArcProbe in the foreground, then connect again.")
+            case .authorization: String(localized: "Google sign-in was cancelled or failed. Check consent test-user access, client configuration and the callback after SideStore installation, then reconnect.")
+            case .noRefresh: String(localized: "No refresh token was granted. Connect again and complete consent.")
+            case .cancelled: String(localized: "Sign-in was cancelled.")
+            case .temporaryRefresh: String(localized: "Google token refresh temporarily failed. Retry when connected.")
             }
         }
     }

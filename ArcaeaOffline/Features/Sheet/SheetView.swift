@@ -13,7 +13,7 @@ struct SheetView: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("Workbook", value: model.metadata?.title ?? (model.connected ? "Connected" : "Not connected"))
+                LabeledContent(String(localized: "Workbook"), value: model.metadata?.title ?? (model.connected ? String(localized: "Connected") : String(localized: "Not connected")))
                 Button(model.connected ? "Choose another workbook" : "Connect Google and choose workbook", systemImage: "link") { Task { await model.connect() } }
                     .disabled(model.busy || model.journalUnreadable || model.exportJournalUnreadable)
                     .accessibilityIdentifier("sheet.connect")

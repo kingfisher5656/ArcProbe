@@ -115,13 +115,14 @@ GitHub repo `kingfisher5656/ArcProbe`, default branch `implementation`. Commit, 
 
 `B50.jpg`, `WhenArcaea*.PNG` and `LiveContainer_Arcaea_Installation_Data_folder/` in the repo root are the owner's personal files (ignored by git). The folder holds login data and game assets: never commit or upload any of it.
 
-## Open items (as of 2026-11-16, version 0.3.1)
+## Open items (as of 2026-11-17, version 0.4.0)
 
-- 0.3.1 was tested only in the iPad simulator. Shortcut automation, SideStore install and real logins are unverified on the physical iPad; if recording misbehaves, first check that the "Arcaea opens" automation starts the new shortcut.
-- Chart data is refreshed only by the "Update constants and levels" button. Nothing refreshes it automatically when a new song appears.
+- 0.4.0 is released (build 43, GitHub release v0.4.0). Only the game folder import was tried on the physical iPad (2026-11-16 test build); everything else was seen only in the iPad simulator: the redesigned Best 50 / Scores / score detail, Settings as a sheet, empty states with buttons, Recent grouped by day, the draggable and pinchable Potential graph, and Korean.
+- Shortcut automation, SideStore install and real logins have not been checked on the physical iPad since 0.3.1. If recording misbehaves, first check that the "Arcaea opens" automation starts the new shortcut.
+- Nobody who reads Korean natively has reviewed the translation yet; the owner does.
+- Whether the remembered game folder still opens after the iPad restarts was not reported.
+- Chart data is refreshed only by the "Update constants and levels" button (and by a game folder import). Nothing refreshes it automatically when a new song appears.
 - A full wiki cover download was not run end to end after the jacket-matching change; the rules were checked against saved copies of the Last, Wandering Melody of Love and Solitary Dream pages.
-- Game folder import (0.4.0, not released): the owner confirmed on the iPad (0.4.0 test build, 2026-11-16) that the folder picker finds Arcaea and the import works. Whether the remembered folder still opens after a restart of the iPad was not reported.
-- Built on 2026-11-17 (0.4.0 build 43) and seen only in the iPad simulator: Settings as a sheet, empty states with buttons, Recent grouped by day with the change against the earlier best, the draggable and pinchable Potential graph, Korean. Nobody who reads Korean natively has reviewed the translation yet; the owner does.
 - The App Shortcut voice phrase ("Fetch recent play with ArcProbe") is English only; a Korean phrase needs an `AppShortcuts.xcstrings`.
 - Design follow-up proposed on 2026-11-16 and not built: one accent colour that is not the Future purple.
 

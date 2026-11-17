@@ -1,7 +1,8 @@
 import ArcaeaCore
 import SwiftUI
 
-/// Top level of Settings: one row per area, details one tap away.
+/// Top level of Settings: one row per area, details one tap away. Shown in a sheet (`SettingsSheet`),
+/// which owns the navigation stack and maps each `SettingsRoute` to its screen.
 struct SettingsView: View {
     @Environment(ArchiveModel.self) private var model
     @Environment(OnlineRuntime.self) private var runtime
@@ -15,47 +16,52 @@ struct SettingsView: View {
                 }
             }
             Section("Accounts") {
-                NavigationLink { MainAccountView() } label: {
-                    SettingsRow(title: "Main account", detail: runtime.mainProfile.map { $0.displayName ?? $0.id.rawValue } ?? "Not signed in", systemImage: "person.crop.circle")
+                NavigationLink(value: SettingsRoute.mainAccount) {
+                    SettingsRow(title: "Main account", detail: runtime.mainProfile.map { $0.displayName ?? $0.id.rawValue } ?? String(localized: "Not signed in"), systemImage: "person.crop.circle")
                 }.accessibilityIdentifier("settings.main")
-                NavigationLink { TrackerAccountView() } label: {
+                NavigationLink(value: SettingsRoute.trackerAccount) {
                     SettingsRow(title: "Tracker account", detail: trackerDetail, systemImage: "binoculars", warning: runtime.recentNeedsAttention)
                 }.accessibilityIdentifier("settings.tracker")
             }
             Section("Automatic tracking") {
                 TrackingStatusCard()
-                NavigationLink { ShortcutSetupView() } label: { Label("Shortcut setup", systemImage: "square.2.layers.3d") }
+                NavigationLink(value: SettingsRoute.shortcuts) { Label("Shortcut setup", systemImage: "square.2.layers.3d") }
                     .accessibilityIdentifier("settings.shortcuts")
             }
+            Section("Game files") {
+                NavigationLink(value: SettingsRoute.gameFolder) {
+                    SettingsRow(title: "Arcaea game folder", detail: GameDataModel.shared.lastImport.map { String(localized: "Imported \($0.formatted(.relative(presentation: .named)))") } ?? String(localized: "Not set up"), systemImage: "folder")
+                }.accessibilityIdentifier("settings.gamedata")
+            }
             Section("Google Sheets") {
-                NavigationLink { SheetView() } label: { Label("Consultant sheet", systemImage: "tablecells") }
+                NavigationLink(value: SettingsRoute.sheet) { Label("Consultant sheet", systemImage: "tablecells") }
                     .accessibilityIdentifier("settings.sheet")
             }
             Section("Library") {
-                NavigationLink { LibraryView() } label: { Label("Charts & cover art", systemImage: "photo.stack") }
+                NavigationLink(value: SettingsRoute.library) { Label("Charts & cover art", systemImage: "photo.stack") }
                     .accessibilityIdentifier("settings.library")
-                NavigationLink { BackupView() } label: { Label("Backup & restore", systemImage: "externaldrive") }
+                NavigationLink(value: SettingsRoute.backup) { Label("Backup & restore", systemImage: "externaldrive") }
                     .accessibilityIdentifier("settings.backup")
             }
             Section {
                 LabeledContent("Version", value: AppInfo.version)
-                NavigationLink("Diagnostics") { DiagnosticsView() }
+                NavigationLink("Diagnostics", value: SettingsRoute.diagnostics)
             } footer: {
-                Text("ArcProbe is unofficial. It only reads your Arcaea Online data and keeps everything on this device.")
+                Text("ArcProbe is unofficial. It only reads your Arcaea data and keeps everything on this device.")
             }
         }
         .navigationTitle("Settings")
         .task { await runtime.refreshStatus() }
     }
     private var trackerDetail: String {
-        if runtime.recentNeedsAttention { return "Needs sign-in" }
-        guard let profile = runtime.recentProfile else { return "Not set up" }
+        if runtime.recentNeedsAttention { return String(localized: "Needs sign-in") }
+        guard let profile = runtime.recentProfile else { return String(localized: "Not set up") }
         return profile.displayName ?? profile.id.rawValue
     }
 }
 
 struct SettingsRow: View {
-    let title: String
+    let title: LocalizedStringKey
     let detail: String
     let systemImage: String
     var warning = false

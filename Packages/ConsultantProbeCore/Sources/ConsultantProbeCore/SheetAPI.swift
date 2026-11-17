@@ -96,16 +96,19 @@ public enum SheetParsing {
     }
 }
 
+/// Wording for people. The translations live in the app's string catalog (`scripts/check-strings.py` collects the English strings from these calls).
+func localized(_ english: String) -> String { Bundle.main.localizedString(forKey: english, value: english, table: nil) }
+
 public struct SheetHTTPError: Error, LocalizedError, Sendable {
     public let status: Int
     public let retryAfter: String?
     public var errorDescription: String? {
         switch status {
-        case 401: "Google authorization expired. Connect again, then retry recovery if needed."
-        case 403: "Google denied access. Check the selected account, file permissions and that Sheets / Drive / Picker APIs are enabled."
-        case 404: "Google could not access the selected file. Select it again through Google Picker."
-        case 429: "Google rate limited this request. Wait \(retryAfter ?? "at least 60") seconds before retrying."
-        default: "Google Sheets request failed (HTTP \(status)). Retry later; pending recovery is preserved."
+        case 401: localized("Google authorization expired. Connect again, then retry recovery if needed.")
+        case 403: localized("Google denied access. Check the selected account, file permissions and that Sheets / Drive / Picker APIs are enabled.")
+        case 404: localized("Google could not access the selected file. Select it again through Google Picker.")
+        case 429: String(format: localized("Google rate limited this request. Wait %@ seconds before retrying."), retryAfter ?? localized("at least 60"))
+        default: String(format: localized("Google Sheets request failed (HTTP %lld). Retry later; pending recovery is preserved."), status)
         }
     }
 }

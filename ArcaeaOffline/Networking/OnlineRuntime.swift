@@ -88,7 +88,7 @@ import WebKit
         guard !isImporting else { throw TrackingError.alreadyFetching }
         await refreshStatus()
         guard let account = mainProfile?.id else { throw OnlineError.expiredSession }
-        isImporting = true; progress = "Checking account"; lastError = nil
+        isImporting = true; progress = String(localized: "Checking account"); lastError = nil
         let task = Task { [importer] in
             try await importer.sync(expectedAccount: account) { update in
                 await self.showProgress(update)
@@ -98,10 +98,10 @@ import WebKit
         defer { importTask = nil; isImporting = false }
         do {
             let receipt = try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
-            progress = "Imported \(receipt.addedCount) new plays and \(receipt.addedPotentialCount) potential observations"
+            progress = String(localized: "Imported \(receipt.addedCount) new plays and \(receipt.addedPotentialCount) potential observations")
             await refreshStatus()
             return receipt
-        } catch { lastError = safeMessage(error); progress = "Import stopped; saved data retained"; throw error }
+        } catch { lastError = safeMessage(error); progress = String(localized: "Import stopped; saved data retained"); throw error }
     }
 
     func cancelImport() { importTask?.cancel() }
@@ -190,19 +190,19 @@ import WebKit
 
     private func showProgress(_ update: ImportProgress) {
         switch update.stage {
-        case .checkingAccount: progress = "Checking account"
-        case .readingScores: progress = "Reading \(update.difficulty?.label ?? "scores") · page \(update.page ?? 1)"
-        case .readingHistory: progress = "Reading five-year potential observations"
-        case .verifyingAccount: progress = "Verifying account and subscription"
-        case .saving: progress = "Saving complete import"
+        case .checkingAccount: progress = String(localized: "Checking account")
+        case .readingScores: progress = String(localized: "Reading \(update.difficulty?.label ?? String(localized: "scores")) · page \(update.page ?? 1)")
+        case .readingHistory: progress = String(localized: "Reading five-year potential observations")
+        case .verifyingAccount: progress = String(localized: "Verifying account and subscription")
+        case .saving: progress = String(localized: "Saving complete import")
         }
     }
     private func safeMessage(_ error: Error) -> String {
         if let error = error as? OnlineError { return error.localizedDescription }
-        if error is CancellationError { return "The operation was cancelled." }
-        if error is TrackingError { return "Another request is running, or the server asked us to wait." }
-        if error is ArchiveError { return "The received data could not be saved. Your previous archive is retained." }
-        return "The operation could not finish. Your saved archive is retained."
+        if error is CancellationError { return String(localized: "The operation was cancelled.") }
+        if error is TrackingError { return String(localized: "Another request is running, or the server asked us to wait.") }
+        if error is ArchiveError { return String(localized: "The received data could not be saved. Your previous archive is retained.") }
+        return String(localized: "The operation could not finish. Your saved archive is retained.")
     }
 }
 
@@ -210,9 +210,9 @@ enum TrackingSetupError: Error, LocalizedError {
     case notConfigured, needsAttention, invalidSession
     var errorDescription: String? {
         switch self {
-        case .notConfigured: "ArcProbe has no tracker account yet. Open ArcProbe → Settings → Tracker account and sign in."
-        case .needsAttention: "ArcProbe tracking stopped: the tracker account needs you to sign in again. Open ArcProbe → Settings → Tracker account."
-        case .invalidSession: "Pass the result of Start Arcaea Tracking as the Session."
+        case .notConfigured: String(localized: "ArcProbe has no tracker account yet. Open ArcProbe → Settings → Tracker account and sign in.")
+        case .needsAttention: String(localized: "ArcProbe tracking stopped: the tracker account needs you to sign in again. Open ArcProbe → Settings → Tracker account.")
+        case .invalidSession: String(localized: "Pass the result of Start Arcaea Tracking as the Session.")
         }
     }
 }

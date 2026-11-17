@@ -8,8 +8,8 @@ or deleting a source file, and after changing the version below.
 from pathlib import Path
 import hashlib, json
 
-MARKETING_VERSION = '0.3.1'
-BUILD_NUMBER = '31'
+MARKETING_VERSION = '0.4.0'
+BUILD_NUMBER = '43'
 BUNDLE_ID = 'app.arcaeaoffline'  # Changing this would orphan installed data and saved logins.
 LOCAL_PACKAGES = ['ArcaeaCore', 'ConsultantProbeCore']
 APP_PACKAGE_PRODUCTS = ['ArcaeaCore', 'ConsultantProbeCore', 'AppAuth']
@@ -34,6 +34,8 @@ resource_refs = {
     'assets': obj('assets', 'isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = ArcaeaOffline/Resources/Assets.xcassets; sourceTree = SOURCE_ROOT;'),
     'fonts': obj('fonts', 'isa = PBXFileReference; lastKnownFileType = folder; path = ArcaeaOffline/Resources/Fonts; sourceTree = SOURCE_ROOT;'),
     'licenses': obj('licenses', 'isa = PBXFileReference; lastKnownFileType = folder; path = ArcaeaOffline/Resources/ThirdPartyLicenses; sourceTree = SOURCE_ROOT;'),
+    # Every translation (English and Korean). Kept current with scripts/sync-strings.sh.
+    'strings': obj('strings', 'isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = ArcaeaOffline/Resources/Localizable.xcstrings; sourceTree = SOURCE_ROOT;'),
 }
 
 products = []; target_ids = []
@@ -69,6 +71,8 @@ for target, ext in TARGETS:
                 'INFOPLIST_KEY_UISupportedInterfaceOrientations': 'UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight',
                 'INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad': 'UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight',
                 'ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME': 'AccentColor', 'ASSETCATALOG_COMPILER_APPICON_NAME': 'AppIcon', 'ENABLE_PREVIEWS': 'YES',
+                # The compiler lists every localisable string it sees (.stringsdata); sync-strings.sh feeds that to the catalog.
+                'SWIFT_EMIT_LOC_STRINGS': 'YES', 'LOCALIZATION_PREFERS_STRING_CATALOGS': 'YES',
             })
         elif is_ui: settings['TEST_TARGET_NAME'] = 'ArcaeaOffline'
         else: settings.update({'TEST_HOST': '$(BUILT_PRODUCTS_DIR)/ArcaeaOffline.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ArcaeaOffline', 'BUNDLE_LOADER': '$(TEST_HOST)'})
@@ -89,11 +93,12 @@ plist = obj('projconfiglist', f'isa = XCConfigurationList; buildConfigurations =
 packages = [obj('pkgref:' + p, f'isa = XCLocalSwiftPackageReference; relativePath = Packages/{p};') for p in LOCAL_PACKAGES]
 # AppAuth (Google sign-in) is the only remote dependency; its version is pinned in Package.resolved.
 packages.append(obj('pkgref:AppAuth', 'isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/openid/AppAuth-iOS.git"; requirement = {kind = exactVersion; version = 3.0.0;};'))
-obj('project', f'isa = PBXProject; attributes = {{ LastUpgradeCheck = 2700; TargetAttributes = {{ {uid("target:ArcaeaOfflineTests")} = {{ TestTargetID = {uid("target:ArcaeaOffline")}; }}; {uid("target:ArcaeaOfflineUITests")} = {{ TestTargetID = {uid("target:ArcaeaOffline")}; }}; }}; }}; buildConfigurationList = {plist}; compatibilityVersion = "Xcode 15.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base); mainGroup = {main}; productRefGroup = {productgroup}; projectDirPath = ""; projectRoot = ""; packageReferences = ({",".join(packages)}); targets = ({",".join(target_ids)});')
+obj('project', f'isa = PBXProject; attributes = {{ LastUpgradeCheck = 2700; TargetAttributes = {{ {uid("target:ArcaeaOfflineTests")} = {{ TestTargetID = {uid("target:ArcaeaOffline")}; }}; {uid("target:ArcaeaOfflineUITests")} = {{ TestTargetID = {uid("target:ArcaeaOffline")}; }}; }}; }}; buildConfigurationList = {plist}; compatibilityVersion = "Xcode 15.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, ko, Base); mainGroup = {main}; productRefGroup = {productgroup}; projectDirPath = ""; projectRoot = ""; packageReferences = ({",".join(packages)}); targets = ({",".join(target_ids)});')
 (project / 'project.pbxproj').write_text('// !$*UTF8*$!\n{ archiveVersion = 1; classes = {}; objectVersion = 60; objects = {\n' + '\n'.join(objects) + '\n}; rootObject = ' + uid('project') + '; }\n')
 
+# Tests match on English text, so the test action runs in English whatever the simulator's language is.
 scheme = project / 'xcshareddata/xcschemes'; scheme.mkdir(parents=True, exist_ok=True)
 def ref(t): return f'<BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="{uid("target:" + t)}" BuildableName="{t}.{"app" if t == "ArcaeaOffline" else "xctest"}" BlueprintName="{t}" ReferencedContainer="container:{project.name}"/>'
 (scheme / 'ArcaeaOffline.xcscheme').write_text(f'''<?xml version="1.0" encoding="UTF-8"?>
-<Scheme LastUpgradeVersion="2700" version="1.7"><BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES"><BuildActionEntries><BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES">{ref('ArcaeaOffline')}</BuildActionEntry></BuildActionEntries></BuildAction><TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES"><Testables><TestableReference skipped="NO">{ref('ArcaeaOfflineTests')}</TestableReference><TestableReference skipped="NO">{ref('ArcaeaOfflineUITests')}</TestableReference></Testables></TestAction><LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugServiceExtension="internal" allowLocationSimulation="YES"><BuildableProductRunnable runnableDebuggingMode="0">{ref('ArcaeaOffline')}</BuildableProductRunnable></LaunchAction><ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO"><BuildableProductRunnable runnableDebuggingMode="0">{ref('ArcaeaOffline')}</BuildableProductRunnable></ProfileAction><AnalyzeAction buildConfiguration="Debug"/><ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="YES"/></Scheme>''')
+<Scheme LastUpgradeVersion="2700" version="1.7"><BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES"><BuildActionEntries><BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES">{ref('ArcaeaOffline')}</BuildActionEntry></BuildActionEntries></BuildAction><TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES" language="en" region="US"><Testables><TestableReference skipped="NO">{ref('ArcaeaOfflineTests')}</TestableReference><TestableReference skipped="NO">{ref('ArcaeaOfflineUITests')}</TestableReference></Testables></TestAction><LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugServiceExtension="internal" allowLocationSimulation="YES"><BuildableProductRunnable runnableDebuggingMode="0">{ref('ArcaeaOffline')}</BuildableProductRunnable></LaunchAction><ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO"><BuildableProductRunnable runnableDebuggingMode="0">{ref('ArcaeaOffline')}</BuildableProductRunnable></ProfileAction><AnalyzeAction buildConfiguration="Debug"/><ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="YES"/></Scheme>''')
 print(f'Generated ArcaeaOffline.xcodeproj {MARKETING_VERSION} ({BUILD_NUMBER}) with {len(files)} Swift files')

@@ -13,11 +13,11 @@ enum LibraryResourceError: Error, LocalizedError {
     case unavailable, missingCover, tooLarge, invalidImage, cooldown(Date)
     var errorDescription: String? {
         switch self {
-        case .unavailable: "The public resource could not be downloaded. Existing data is retained."
-        case .tooLarge: "The download exceeded the size limit. Existing data is retained."
-        case .missingCover: "This cover is not available on the official asset server."
-        case .invalidImage: "The server did not return a supported cover image."
-        case .cooldown(let date): "The server asked us to wait until \(date.formatted(date: .omitted, time: .shortened))."
+        case .unavailable: String(localized: "The public resource could not be downloaded. Existing data is retained.")
+        case .tooLarge: String(localized: "The download exceeded the size limit. Existing data is retained.")
+        case .missingCover: String(localized: "This cover is not available on the official asset server.")
+        case .invalidImage: String(localized: "The server did not return a supported cover image.")
+        case .cooldown(let date): String(localized: "The server asked us to wait until \(date.formatted(date: .omitted, time: .shortened)).")
         }
     }
 }
@@ -62,19 +62,39 @@ struct PublicResourceLoader: Sendable {
     private(set) var progress = ""
     private(set) var constantsDate: Date? = UserDefaults.standard.object(forKey: "constantsFetchedAt") as? Date
     var message: String?
+    /// Which pack each song belongs to: bundled with the app, replaced by the wiki or a game folder.
+    private(set) var packs: PackCatalog = LibraryResources.savedPacks()
     private var downloadTask: Task<Void, Never>?
 
-    static func coverKey(_ identifier: String) -> String {
+    nonisolated static func coverKey(_ identifier: String) -> String {
         SHA256.hash(data: Data(identifier.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+    /// Where a chart's cover is looked for, best first: the game's own jacket for that difficulty,
+    /// the game's jacket for the song, a wiki cover, then the small official thumbnail.
+    nonisolated static func coverIdentifiers(chart: ChartID, official: String?) -> [String] {
+        [gameCoverKey(chart), gameCoverKey(songID: chart.songID), "wiki:\(chart.songID):\(chart.difficulty.rawValue)"] + (official.map { [$0] } ?? [])
+    }
+    nonisolated static func gameCoverKey(_ chart: ChartID) -> String { "game:\(chart.songID):\(chart.difficulty.rawValue)" }
+    nonisolated static func gameCoverKey(songID: String) -> String { "game:\(songID)" }
+    nonisolated static func coverFolder() throws -> URL {
+        let folder = try ArchiveLocation.directory().appendingPathComponent("covers", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+    /// Call after cover files were written outside this class.
+    func coversChanged() { memory.removeAllObjects(); revision += 1 }
+    func hasGameCover(_ chart: ChartID) -> Bool {
+        guard let folder = try? Self.coverFolder() else { return false }
+        return [Self.gameCoverKey(chart), Self.gameCoverKey(songID: chart.songID)].contains {
+            FileManager.default.fileExists(atPath: folder.appendingPathComponent(Self.coverKey($0) + ".jpg").path)
+        }
     }
     static func coverURL(_ identifier: String) -> URL? {
         guard ArtworkPolicy.validIdentifier(identifier) else { return nil }
         return URL(string: "https://webassets.lowiro.com/\(identifier).jpg")
     }
     private func file(_ identifier: String) throws -> URL {
-        let folder = try ArchiveLocation.directory().appendingPathComponent("covers", isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder.appendingPathComponent(Self.coverKey(identifier) + ".jpg")
+        try Self.coverFolder().appendingPathComponent(Self.coverKey(identifier) + ".jpg")
     }
     func image(for identifier: String?) -> UIImage? {
         guard let identifier else { return nil }
@@ -88,7 +108,7 @@ struct PublicResourceLoader: Sendable {
     private func wikiKey(_ chart: ChartID) -> String { "wiki:\(chart.songID):\(chart.difficulty.rawValue)" }
     func hasWikiCover(_ chart: ChartID) -> Bool { image(for: wikiKey(chart)) != nil }
     func image(chart: ChartID, officialIdentifier: String?) -> UIImage? {
-        image(for: wikiKey(chart)) ?? image(for: officialIdentifier)
+        Self.coverIdentifiers(chart: chart, official: officialIdentifier).lazy.compactMap { self.image(for: $0) }.first
     }
     func saveWikiCover(_ data: Data, chart: ChartID) throws {
         guard data.count <= 8 * 1024 * 1024,
@@ -104,7 +124,21 @@ struct PublicResourceLoader: Sendable {
         memory.removeObject(forKey: Self.coverKey(key) as NSString)
         revision += 1
     }
-    /// Downloads chart constants, then levels and names for charts the app has not seen yet.
+    private nonisolated static func packFile() throws -> URL { try ArchiveLocation.directory().appendingPathComponent("pack-catalog.json") }
+    private nonisolated static func savedPacks() -> PackCatalog {
+        let bundled = PackCatalog.bundled()
+        guard let file = try? packFile(), let data = try? Data(contentsOf: file),
+              let saved = try? JSONDecoder().decode(PackCatalog.self, from: data) else { return bundled }
+        // A newer app can ship a newer pack list than the one saved by an older update.
+        return bundled.merging(packs: saved.packs.count >= bundled.packs.count ? saved.packs : nil, songPacks: saved.songPacks)
+    }
+    func updatePacks(packs newPacks: [Pack]?, songPacks: [String: String]) {
+        let merged = packs.merging(packs: newPacks, songPacks: songPacks)
+        guard merged != packs else { return }
+        packs = merged
+        if let file = try? Self.packFile(), let data = try? JSONEncoder().encode(merged) { try? data.write(to: file, options: .atomic) }
+    }
+    /// Downloads chart constants, then levels, names and packs for charts the app has not seen yet.
     func refreshChartData(store: ArchiveStore) async throws {
         guard !refreshingConstants else { return }
         refreshingConstants = true; defer { refreshingConstants = false }
@@ -120,10 +154,18 @@ struct PublicResourceLoader: Sendable {
                 let list = try await loader.load(URL(string: "https://arcaea.miraheze.org/wiki/Data:Songlist.json?action=raw")!, limit: 8 * 1024 * 1024)
                 let levels = try await Task.detached { try SongListSnapshot.parse(list) }.value
                 try await Task.detached { try store.applySongList(levels) }.value
-                message = "Updated constants and levels for \(levels.charts.count) charts."
+                // Songs already carry their pack ID; only the pack names depend on this last download.
+                var packList: [Pack]?
+                do {
+                    let data = try await loader.load(URL(string: "https://arcaea.miraheze.org/wiki/Data:Packlist.json?action=raw")!, limit: 2 * 1024 * 1024)
+                    packList = try await Task.detached { try PackCatalog.parsePackList(data) }.value
+                } catch { saveCooldown(error, key: "constantsCooldown") }
+                updatePacks(packs: packList, songPacks: levels.songPacks)
+                message = packList == nil ? String(localized: "Updated constants and levels for \(levels.charts.count) charts. Pack names could not be updated.")
+                    : String(localized: "Updated constants, levels and packs for \(levels.charts.count) charts.")
             } catch {
                 saveCooldown(error, key: "constantsCooldown")
-                message = "Updated \(snapshot.charts.count) chart constants. Levels could not be updated: \(error.localizedDescription)"
+                message = String(localized: "Updated \(snapshot.charts.count) chart constants. Levels could not be updated: \(error.localizedDescription)")
             }
         } catch { saveCooldown(error, key: "constantsCooldown"); throw error }
     }
@@ -142,7 +184,7 @@ struct PublicResourceLoader: Sendable {
                     guard let url = Self.coverURL(identifier) else { continue }
                     let destination = try file(identifier)
                     if !refresh, FileManager.default.fileExists(atPath: destination.path) { continue }
-                    progress = "Cover \(index + 1) of \(identifiers.count)"
+                    progress = String(localized: "Cover \(index + 1) of \(identifiers.count)")
                     do {
                         let bytes = try await loader.load(url, limit: 4 * 1024 * 1024, image: true)
                         let thumbnail = try Self.thumbnail(bytes)
@@ -154,8 +196,8 @@ struct PublicResourceLoader: Sendable {
                     catch LibraryResourceError.invalidImage { missing += 1 }
                     try await Task.sleep(for: .seconds(0.5))
                 }
-                message = identifiers.isEmpty ? "No official cover identifiers yet. Import your main account’s scores first." : "Saved \(saved) covers; \(missing) unavailable. Previously cached covers retained."
-            } catch is CancellationError { message = "Cover download cancelled. Completed covers are retained." }
+                message = identifiers.isEmpty ? String(localized: "No official cover identifiers yet. Import your main account’s scores first.") : String(localized: "Saved \(saved) covers; \(missing) unavailable. Previously cached covers retained.")
+            } catch is CancellationError { message = String(localized: "Cover download cancelled. Completed covers are retained.") }
             catch { saveCooldown(error, key: "coverCooldown"); message = error.localizedDescription }
         }
     }
@@ -188,7 +230,7 @@ struct PublicResourceLoader: Sendable {
             defer { if accessed { input.stopAccessingSecurityScopedResource() } }
             return try CoverBackup.restore(from: input, into: folder)
         }.value
-        message = "Restored \(result.imported) covers; kept \(result.retained) existing covers of equal or higher resolution."
+        message = String(localized: "Restored \(result.imported) covers; kept \(result.retained) existing covers of equal or higher resolution.")
     }
     func cancelDownload() { downloadTask?.cancel() }
     static func thumbnail(_ data: Data) throws -> Data {

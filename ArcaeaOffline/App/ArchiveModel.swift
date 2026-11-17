@@ -42,13 +42,13 @@ final class ArchiveModel {
         ranking = try RatingCalculator(catalog: catalog).rank(bestScores: bestScores)
     }
     func save(_ draft: ScoreDraft, editing observationID: ObservationID? = nil, correctingBest: Bool = false) throws {
-        guard (0...10_100_000).contains(draft.score) else { throw ArchiveError.invalidRecord("Score must be between 0 and 10,100,000.") }
+        guard (0...10_100_000).contains(draft.score) else { throw ArchiveError.invalidRecord(String(localized: "Score must be between 0 and 10,100,000.")) }
         let account = selectedAccountID ?? AccountID("local")
         let previous = observationID.flatMap { id in observations.first { $0.original.id == id }?.values }
         let timestamp = try draft.playedAt.map { date in
             if let original = previous?.playedAt, original.date == date { return original }
             let millis = (date.timeIntervalSince1970 * 1000).rounded(.towardZero)
-            guard millis.isFinite, let value = Int64(exactly: millis) else { throw ArchiveError.invalidRecord("Date is outside the supported range.") }
+            guard millis.isFinite, let value = Int64(exactly: millis) else { throw ArchiveError.invalidRecord(String(localized: "Date is outside the supported range.")) }
             return SourceTimestamp(value: value, unit: .milliseconds, origin: .manual)
         }
         let values = ScoreValues(score: draft.score, playedAt: timestamp, judgments: draft.judgments, playClear: draft.playClear, bestClear: draft.bestClear, modifier: draft.clearModifier ? nil : draft.modifier ?? previous?.modifier, health: draft.clearHealth ? nil : draft.health ?? previous?.health)
@@ -59,25 +59,25 @@ final class ArchiveModel {
         undoToken = try store.applyManual(change: change)
         selectedAccountID = account
         try reload()
-        notice = correctingBest ? "Chart best corrected" : observationID == nil ? "Score saved" : "Play updated"
+        notice = correctingBest ? String(localized: "Chart best corrected") : observationID == nil ? String(localized: "Score saved") : String(localized: "Play updated")
     }
     func delete(_ observation: EffectiveObservation) throws {
         undoToken = try store.applyManual(change: .suppress(accountID: observation.original.accountID, observationID: observation.original.id))
-        try reload(); notice = "Play deleted"
+        try reload(); notice = String(localized: "Play deleted")
     }
     func undoLastChange() throws {
         guard let undoToken else { return }
         try store.undo(undoToken)
-        try reload(); notice = "Change undone"
+        try reload(); notice = String(localized: "Change undone")
     }
     func resetBest(_ chart: ChartID) throws {
         guard let account = selectedAccountID else { return }
         undoToken = try store.applyManual(change: .resetBestCorrection(accountID: account, chartID: chart))
-        try reload(); notice = "Imported chart best restored"
+        try reload(); notice = String(localized: "Imported chart best restored")
     }
     func resetOverride(_ play: EffectiveObservation) throws {
         undoToken = try store.applyManual(change: .resetOverride(accountID: play.original.accountID, observationID: play.original.id))
-        try reload(); notice = "Original play restored"
+        try reload(); notice = String(localized: "Original play restored")
     }
     func backupFile() throws -> ShareFile {
         let data = try ArchiveBackup(store: store).export()
@@ -89,7 +89,7 @@ final class ArchiveModel {
     }
     func restoreBackup(_ data: Data) throws {
         let receipt = try ArchiveBackup(store: store).validateAndRestore(data: data)
-        try reload(); notice = "Backup restored: \(receipt.addedCount) plays added"
+        try reload(); notice = String(localized: "Backup restored: \(receipt.addedCount) plays added")
     }
 }
 

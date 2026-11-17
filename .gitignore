@@ -12,3 +12,5 @@ artifacts/
 # Owner's personal exports and screenshots
 /B50.jpg
 /WhenArcaea*.PNG
+# Copy of the owner's Arcaea data folder (login data, game assets): never commit
+/LiveContainer_Arcaea_Installation_Data_folder/

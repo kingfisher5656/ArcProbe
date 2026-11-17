@@ -4,6 +4,10 @@ import SwiftUI
 /// What automatic tracking is doing right now, in one glance.
 struct TrackingStatusCard: View {
     @Environment(OnlineRuntime.self) private var runtime
+    @Environment(AppNavigation.self) private var navigation
+    /// Offers the way to the screens that fix "not set up" and "needs sign-in". Off inside Settings, where those
+    /// screens are the next rows.
+    var showsActions = false
 
     enum Phase: Equatable {
         case notSetUp, needsSignIn, stalled, tracking, closing, idle
@@ -17,12 +21,12 @@ struct TrackingStatusCard: View {
         }
         var title: String {
             switch self {
-            case .notSetUp: "Tracker not set up"
-            case .needsSignIn: "Tracker needs to sign in again"
-            case .stalled: "Arcaea is open, but the Shortcut stopped checking"
-            case .tracking: "Tracking plays"
-            case .closing: "Arcaea closed · final checks"
-            case .idle: "Waiting for Arcaea to open"
+            case .notSetUp: String(localized: "Tracker not set up")
+            case .needsSignIn: String(localized: "Tracker needs to sign in again")
+            case .stalled: String(localized: "Arcaea is open, but the Shortcut stopped checking")
+            case .tracking: String(localized: "Tracking plays")
+            case .closing: String(localized: "Arcaea closed · final checks")
+            case .idle: String(localized: "Waiting for Arcaea to open")
             }
         }
         var systemImage: String {
@@ -56,10 +60,21 @@ struct TrackingStatusCard: View {
                     Text("Reopen Arcaea to restart the loop. If this keeps happening, check the automation in Shortcuts.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
+                if showsActions, phase == .notSetUp || phase == .needsSignIn {
+                    if phase == .notSetUp {
+                        Text("Sign in with a tracker account and build the Shortcut, and each play is saved as you finish it.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    HStack(spacing: 10) {
+                        Button(phase == .needsSignIn ? "Sign in again" : "Tracker account") { navigation.openSettings(.trackerAccount) }
+                            .accessibilityIdentifier("tracking.openTracker")
+                        if phase == .notSetUp { Button("Shortcut setup") { navigation.openSettings(.shortcuts) }.accessibilityIdentifier("tracking.openShortcuts") }
+                    }.buttonStyle(.bordered).controlSize(.small).padding(.top, 2)
+                }
                 if let status, phase != .notSetUp {
                     if phase == .tracking, let next = status.nextPollAt, next > timeline.date { row("Next check", next.formatted(date: .omitted, time: .standard)) }
-                    row("Last check", status.lastAttemptAt.map { relative($0, now: timeline.date) + (status.lastStatus.map { " · " + label($0) } ?? "") } ?? "Never")
-                    row("Last new play", status.lastNewPlayAt.map { relative($0, now: timeline.date) } ?? "None yet")
+                    row("Last check", lastCheck(status, now: timeline.date))
+                    row("Last new play", status.lastNewPlayAt.map { relative($0, now: timeline.date) } ?? String(localized: "None yet"))
                     if let cooldown = status.cooldownUntil, cooldown > timeline.date { row("Server asked to wait until", cooldown.formatted(date: .omitted, time: .standard)) }
                 }
             }
@@ -67,21 +82,25 @@ struct TrackingStatusCard: View {
         .task { while !Task.isCancelled { await runtime.refreshStatus(); try? await Task.sleep(for: .seconds(15)) } }
     }
 
-    private func row(_ title: String, _ value: String) -> some View {
+    private func lastCheck(_ status: TrackingStatus, now: Date) -> String {
+        guard let attempt = status.lastAttemptAt else { return String(localized: "Never") }
+        return relative(attempt, now: now) + (status.lastStatus.map { " · " + label($0) } ?? "")
+    }
+    private func row(_ title: LocalizedStringKey, _ value: String) -> some View {
         HStack { Text(title); Spacer(); Text(value).foregroundStyle(.secondary) }.font(.subheadline)
     }
     private func relative(_ date: Date, now: Date) -> String {
-        now.timeIntervalSince(date) < 60 ? "Just now" : date.formatted(.relative(presentation: .named))
+        now.timeIntervalSince(date) < 60 ? String(localized: "Just now") : date.formatted(.relative(presentation: .named))
     }
     private func label(_ status: FetchStatus) -> String {
         switch status {
-        case .success: "new play"
-        case .unchanged: "nothing new"
-        case .offline: "offline"
-        case .rateLimited, .cooldown: "told to wait"
-        case .authenticationRequired, .attentionRequired, .wrongAccount: "needs sign-in"
-        case .deadlineExceeded: "timed out"
-        default: "failed"
+        case .success: String(localized: "new play")
+        case .unchanged: String(localized: "nothing new")
+        case .offline: String(localized: "offline")
+        case .rateLimited, .cooldown: String(localized: "told to wait")
+        case .authenticationRequired, .attentionRequired, .wrongAccount: String(localized: "needs sign-in")
+        case .deadlineExceeded: String(localized: "timed out")
+        default: String(localized: "failed")
         }
     }
 }

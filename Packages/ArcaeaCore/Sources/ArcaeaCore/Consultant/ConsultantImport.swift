@@ -5,8 +5,8 @@ public enum ConsultantImportError: Error, LocalizedError {
     case unsupportedLayout, stalePreview
     public var errorDescription: String? {
         switch self {
-        case .unsupportedLayout: "This sheet version or score layout is not supported. The first import version supports consultant v9.0.2a-beta. No scores were imported."
-        case .stalePreview: "The archive changed after this preview. Refresh the preview before importing."
+        case .unsupportedLayout: localized("This sheet version or score layout is not supported. The first import version supports consultant v9.0.2a-beta. No scores were imported.")
+        case .stalePreview: localized("The archive changed after this preview. Refresh the preview before importing.")
         }
     }
 }

@@ -25,7 +25,7 @@ struct TrackerAccountView: View {
                      : "Sign in here with the account you play on. No spare account is needed.")
             }
             Section {
-                LabeledContent("Signed in as", value: runtime.recentProfile.map { $0.displayName ?? $0.id.rawValue } ?? "Not signed in")
+                LabeledContent(String(localized: "Signed in as"), value: runtime.recentProfile.map { $0.displayName ?? $0.id.rawValue } ?? String(localized: "Not signed in"))
                 if let configuration = runtime.recentConfiguration { LabeledContent("Watching", value: name(configuration.target)) }
                 if runtime.recentNeedsAttention {
                     Label("The website rejected this login. Sign in again.", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)

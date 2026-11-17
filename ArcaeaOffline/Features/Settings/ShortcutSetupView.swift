@@ -34,9 +34,9 @@ struct ShortcutSetupView: View {
         }
         .navigationTitle("Shortcut setup").navigationBarTitleDisplayMode(.inline)
     }
-    private func step(_ number: Int, _ text: String, indent: Bool = false) -> some View {
+    private func step(_ number: Int, _ text: LocalizedStringKey, indent: Bool = false) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text("\(number)").font(.subheadline.monospacedDigit().weight(.semibold)).foregroundStyle(.secondary)
+            Text(verbatim: "\(number)").font(.subheadline.monospacedDigit().weight(.semibold)).foregroundStyle(.secondary)
             Text(text)
         }.padding(.leading, indent ? 22 : 0)
     }
@@ -51,7 +51,7 @@ private struct NotificationMethodView: View {
                 Text("Instead of one shortcut that waits between checks, ArcProbe posts a silent notification for each check, and a Notification automation runs it. This has not been verified on a real device yet. Use either this or the Repeat loop, never both.")
             }
             Section("Notifications") {
-                LabeledContent("Permission", value: allowed == nil ? "Checking…" : allowed == true ? "Allowed" : "Not allowed")
+                LabeledContent("Permission", value: allowed == nil ? String(localized: "Checking…") : allowed == true ? String(localized: "Allowed") : String(localized: "Not allowed"))
                 if allowed == false {
                     Button("Allow notifications") {
                         Task {

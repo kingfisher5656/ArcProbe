@@ -9,20 +9,20 @@ public enum OnlineError: Error, Equatable, Sendable {
 extension OnlineError: LocalizedError {
     public var errorDescription: String? {
         switch self {
-        case .expiredSession: "Sign in to this account again."
-        case .credentialsRejected: "The recent account credentials were rejected. Reconfigure the account."
-        case .interactionRequired: "Open the official login in the app to finish account verification."
-        case .subscriptionRequired: "The main account needs an active Arcaea Online subscription for full import."
-        case .wrongAccount: "The signed-in account differs from the connected account."
-        case .targetNotFound: "The selected account was not found in this account's friends list."
-        case .unsupportedResponse: "The website returned an unsupported response. Saved data is unchanged."
-        case .oversizedResponse: "The website response exceeded the safe collection limit."
-        case .forbiddenURL: "The request left the allowed official route."
-        case .rateLimited: "The server asked us to wait before another request."
-        case .network: "The website could not be reached. Saved data is unchanged."
-        case .locked: "Unlock the device once to make this account available."
-        case .cancelled: "The request was cancelled."
-        case .deadlineExceeded: "The recent request reached its time limit. Try again later."
+        case .expiredSession: localized("Sign in to this account again.")
+        case .credentialsRejected: localized("The recent account credentials were rejected. Reconfigure the account.")
+        case .interactionRequired: localized("Open the official login in the app to finish account verification.")
+        case .subscriptionRequired: localized("The main account needs an active Arcaea Online subscription for full import.")
+        case .wrongAccount: localized("The signed-in account differs from the connected account.")
+        case .targetNotFound: localized("The selected account was not found in this account's friends list.")
+        case .unsupportedResponse: localized("The website returned an unsupported response. Saved data is unchanged.")
+        case .oversizedResponse: localized("The website response exceeded the safe collection limit.")
+        case .forbiddenURL: localized("The request left the allowed official route.")
+        case .rateLimited: localized("The server asked us to wait before another request.")
+        case .network: localized("The website could not be reached. Saved data is unchanged.")
+        case .locked: localized("Unlock the device once to make this account available.")
+        case .cancelled: localized("The request was cancelled.")
+        case .deadlineExceeded: localized("The recent request reached its time limit. Try again later.")
         }
     }
 }

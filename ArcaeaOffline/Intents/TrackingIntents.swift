@@ -103,18 +103,18 @@ extension FetchResult {
     /// One line for people: used by the in-app button and the one-shot Shortcut action.
     var summary: String {
         switch status {
-        case .success: "Saved \(addedCount) new play\(addedCount == 1 ? "" : "s")"
-        case .unchanged: "No new play"
-        case .cooldown, .rateLimited: "The server asked us to wait" + (nextEligibleAt.map { " until \($0.formatted(date: .omitted, time: .shortened))" } ?? "")
-        case .alreadyFetching: "Another check is already running"
-        case .authenticationRequired, .attentionRequired: "The tracker account needs to sign in again"
-        case .wrongAccount: "The tracker account can no longer see the watched account"
-        case .locked: "Unlock the device once, then try again"
-        case .offline: "No connection"
-        case .deadlineExceeded: "The server took too long"
-        case .cancelled: "Cancelled"
-        case .unsupportedSchema: "The website sent something unexpected"
-        case .failed: "The check failed; it will be retried"
+        case .success: String(localized: "Saved \(addedCount) new plays")
+        case .unchanged: String(localized: "No new play")
+        case .cooldown, .rateLimited: nextEligibleAt.map { String(localized: "The server asked us to wait until \($0.formatted(date: .omitted, time: .shortened))") } ?? String(localized: "The server asked us to wait")
+        case .alreadyFetching: String(localized: "Another check is already running")
+        case .authenticationRequired, .attentionRequired: String(localized: "The tracker account needs to sign in again")
+        case .wrongAccount: String(localized: "The tracker account can no longer see the watched account")
+        case .locked: String(localized: "Unlock the device once, then try again")
+        case .offline: String(localized: "No connection")
+        case .deadlineExceeded: String(localized: "The server took too long")
+        case .cancelled: String(localized: "Cancelled")
+        case .unsupportedSchema: String(localized: "The website sent something unexpected")
+        case .failed: String(localized: "The check failed; it will be retried")
         }
     }
 }

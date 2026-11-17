@@ -5,13 +5,13 @@ public enum ConsultantExportError: Error, LocalizedError {
     case layout, stale, account, pending, unverified, selection, tooSoon
     public var errorDescription: String? {
         switch self {
-        case .layout: "The sheet layout is not supported for sending scores. Only consultant v9.0.2a-beta is supported."
-        case .stale: "The archive or sheet changed after this preview. Refresh the preview before sending."
-        case .account: "Select an existing ArcProbe account before sending scores."
-        case .pending: "A previous send still needs verification. Check it before sending again."
-        case .unverified: "The sent scores have not all been verified. Check the pending send again after the sheet finishes calculating. No automatic resend was made."
-        case .selection: "The selected account or workbook changed. Return to the original selection or refresh the preview."
-        case .tooSoon: "Wait at least five minutes after the send, then check the sheet before dismissing its pending record."
+        case .layout: localized("The sheet layout is not supported for sending scores. Only consultant v9.0.2a-beta is supported.")
+        case .stale: localized("The archive or sheet changed after this preview. Refresh the preview before sending.")
+        case .account: localized("Select an existing ArcProbe account before sending scores.")
+        case .pending: localized("A previous send still needs verification. Check it before sending again.")
+        case .unverified: localized("The sent scores have not all been verified. Check the pending send again after the sheet finishes calculating. No automatic resend was made.")
+        case .selection: localized("The selected account or workbook changed. Return to the original selection or refresh the preview.")
+        case .tooSoon: localized("Wait at least five minutes after the send, then check the sheet before dismissing its pending record.")
         }
     }
 }
